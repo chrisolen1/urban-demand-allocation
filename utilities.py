@@ -1,5 +1,6 @@
 import json
 from shapely.geometry import shape, Point, Polygon
+import re
 
 # lookup up the key corresponding to the lat/long point based on what polygon it fits in
 
@@ -39,6 +40,27 @@ def list_invalid_polygons(polygon_dict, polygon_name):
             invalids.append(names[i])
 
 
+# convert from networkx format to neo4j (not able to convert node attributes at this point):
+
+def nx_to_neo_nodes(graph, return_nodes=True, return_edges=True):
+    
+    nx_nodes = list(graph.nodes(data=True))
+    neo_nodes = ["CREATE " + "(" + re.sub(r'\W+','', nx_nodes[i][0]) + ":" + list(nx_nodes[i][1].keys())[0] + " {" + list(list(nx_nodes[i][1].values())[0].keys())[0] + ":" + '"' + list(nx_nodes[i][1].values())[0]['name'] + '"' + "," + list(list(nx_nodes[i][1].values())[0].keys())[1] + ":" + '"' + str(list(nx_nodes[i][1].values())[0]['avg_property_value']) + '"' + "}" + ")" for i in range(len(nx_nodes))]
+    
+    nx_edges = list(graph.edges.data())
+    neo_edges = ["CREATE " + "(" + re.sub(r'\W+','',nx_edges[i][0]) + ")" + "-[:" + list(nx_edges[i][2].keys())[0] + " " + str(list(nx_edges[i][2].values())[0]) + "]" + "->" + "(" + re.sub(r'\W+','',nx_edges[i][1]) + ")" for i in range(len(nx_edges))]
+    
+    if return_nodes and return_edges:
+        neo = neo_nodes + neo_edges
+        
+    elif return_nodes and not return_edges:
+        neo = neo_nodes
+        
+    elif not return_nodes and return_edges:
+        neo = neo_edges    
+    
+    return neo
+    
 
 
     
