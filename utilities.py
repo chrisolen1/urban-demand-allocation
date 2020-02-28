@@ -5,12 +5,15 @@ from shapely.geometry import shape, Point, Polygon
 
 def point_lookup(polygon_dict, point):
     
+    point = Point(point) # point should be a tuple
+    
     for i in range(len(list(polygon_dict.keys()))):
         result = Polygon(polygon_dict[list(polygon_dict.keys())[i]][0]).contains(point) # zero index is there because of zoning type in zoning data
         
         if result == True:
             return list(polygon_dict.keys())[i]
             break 
+       
        
 # confirm intersection of two polygons
 
