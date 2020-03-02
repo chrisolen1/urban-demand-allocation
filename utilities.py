@@ -42,7 +42,7 @@ def list_invalid_polygons(polygon_dict, polygon_name):
 
 # convert from networkx format to neo4j (not able to convert node attributes at this point):
 
-def nx_to_neo_nodes(graph, return_nodes=True, return_edges=True):
+def nx_to_neo_nodes2(graph, return_nodes=True, return_edges=True):
 
     nx_nodes = list(graph.nodes.data())
     neo_nodes = ["CREATE " + "(" + re.sub(r'\W+','', nx_nodes[i][0]) + ":" + list(nx_nodes[i][1].keys())[0] + " {" + list(list(nx_nodes[i][1].values())[0].keys())[0] + ":" + '"' + list(nx_nodes[i][1].values())[0]['name'] + '"' + "," + list(list(nx_nodes[i][1].values())[0].keys())[1] + ":" + '"' + str(list(nx_nodes[i][1].values())[0]['avg_property_value']) + '"' + "}" + ")" for i in range(len(nx_nodes))]
@@ -62,8 +62,47 @@ def nx_to_neo_nodes(graph, return_nodes=True, return_edges=True):
     return neo
     
 
+def nx_to_neo_nodes(graph, return_nodes=True, return_edges=True):
+
+    n_attributes = len(list(list(list(graph.nodes.data())[0][1].values())[0].keys())) # assumes the number and types of node attributes of the first node can be generalized to the others
+    
+    node_attributes = list(list(list(graph.nodes.data())[0][1].values())[0].keys())
+
+    nx_nodes = list(graph.nodes.data())
+    neo_nodes = []
 
     
+
+    for i in range(len(nx_nodes)):
+
+        root_info = "CREATE " + "(" + "%s" + ":" + "%s" + " {" + "%s" + ":" + '"' + "%s" + '"'
+        root_info = root_info % (re.sub(r'\W+','', nx_nodes[i][0]), list(nx_nodes[i][1].keys())[0], list(list(nx_nodes[i][1].values())[0].keys())[0], list(nx_nodes[i][1].values())[0]['name'])
+
+        end_string = "}" + ")"
+
+        additional_attributes = "" 
+        for j in range(1,n_attributes):
+        
+            attribute = "," + "%s" + ":" + '"' + "%s" + '"'
+            attribute = attribute % (list(list(nx_nodes[i][1].values())[0].keys())[j], str(list(nx_nodes[i][1].values())[0][node_attributes[j]]))
+            additional_attributes += attribute 
+
+        concatenated = root_info + additional_attributes + end_string
+        neo_nodes.append(concatenated)
+    
+    nx_edges = list(graph.edges.data())
+    neo_edges = ["CREATE " + "(" + re.sub(r'\W+','',nx_edges[i][0]) + ")" + "-[:" + list(nx_edges[i][2].keys())[0] + " " + str(list(nx_edges[i][2].values())[0]) + "]" + "->" + "(" + re.sub(r'\W+','',nx_edges[i][1]) + ")" for i in range(len(nx_edges))]
+    
+    if return_nodes and return_edges:
+        neo = neo_nodes + neo_edges
+        
+    elif return_nodes and not return_edges:
+        neo = neo_nodes
+        
+    elif not return_nodes and return_edges:
+        neo = neo_edges    
+    
+    return neo    
     
     
     
