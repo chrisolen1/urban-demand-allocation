@@ -1,6 +1,7 @@
 import json
 from shapely.geometry import shape, Point, Polygon
 import re
+from operator import itemgetter
 
 # lookup up the key corresponding to the lat/long point based on what polygon it fits in
 
@@ -15,6 +16,19 @@ def point_lookup(polygon_dict, point):
             return list(polygon_dict.keys())[i]
             break 
        
+def closest_to(polygon_dict, point):
+
+    point = Point(point) # point should be a tuple
+    distances = []
+
+    for i in range(len(list(polygon_dict.keys()))):
+        dist = point.distance(Polygon(polygon_dict[list(polygon_dict.keys())[i]][0])) # zero index is there because of zoning type in zoning data
+        distances.append(dist)
+
+    j, value = min(enumerate(distances), key=itemgetter(1))
+    result = list(polygon_dict.keys())[j]
+    return result
+
        
 # confirm intersection of two polygons
 
@@ -42,38 +56,35 @@ def list_invalid_polygons(polygon_dict, polygon_name):
 
 # convert from networkx format to neo4j (not able to convert node attributes at this point):
 
-def nx_to_neo_nodes2(graph, return_nodes=True, return_edges=True):
+#def nx_to_neo_nodes2(graph, return_nodes=True, return_edges=True):
 
-    nx_nodes = list(graph.nodes.data())
-    neo_nodes = ["CREATE " + "(" + re.sub(r'\W+','', nx_nodes[i][0]) + ":" + list(nx_nodes[i][1].keys())[0] + " {" + list(list(nx_nodes[i][1].values())[0].keys())[0] + ":" + '"' + list(nx_nodes[i][1].values())[0]['name'] + '"' + "," + list(list(nx_nodes[i][1].values())[0].keys())[1] + ":" + '"' + str(list(nx_nodes[i][1].values())[0]['avg_property_value']) + '"' + "}" + ")" for i in range(len(nx_nodes))]
+    #nx_nodes = list(graph.nodes.data())
+    #neo_nodes = ["CREATE " + "(" + re.sub(r'\W+','', nx_nodes[i][0]) + ":" + list(nx_nodes[i][1].keys())[0] + " {" + list(list(nx_nodes[i][1].values())[0].keys())[0] + ":" + '"' + list(nx_nodes[i][1].values())[0]['name'] + '"' + "," + list(list(nx_nodes[i][1].values())[0].keys())[1] + ":" + '"' + str(list(nx_nodes[i][1].values())[0]['avg_property_value']) + '"' + "}" + ")" for i in range(len(nx_nodes))]
     
-    nx_edges = list(graph.edges.data())
-    neo_edges = ["CREATE " + "(" + re.sub(r'\W+','',nx_edges[i][0]) + ")" + "-[:" + list(nx_edges[i][2].keys())[0] + " " + str(list(nx_edges[i][2].values())[0]) + "]" + "->" + "(" + re.sub(r'\W+','',nx_edges[i][1]) + ")" for i in range(len(nx_edges))]
+    #nx_edges = list(graph.edges.data())
+    #neo_edges = ["CREATE " + "(" + re.sub(r'\W+','',nx_edges[i][0]) + ")" + "-[:" + list(nx_edges[i][2].keys())[0] + " " + str(list(nx_edges[i][2].values())[0]) + "]" + "->" + "(" + re.sub(r'\W+','',nx_edges[i][1]) + ")" for i in range(len(nx_edges))]
     
-    if return_nodes and return_edges:
-        neo = neo_nodes + neo_edges
+    #if return_nodes and return_edges:
+    #    neo = neo_nodes + neo_edges
         
-    elif return_nodes and not return_edges:
-        neo = neo_nodes
+    #elif return_nodes and not return_edges:
+    #    neo = neo_nodes
         
-    elif not return_nodes and return_edges:
-        neo = neo_edges    
+    #elif not return_nodes and return_edges:
+    #    neo = neo_edges    
     
-    return neo
+    #return neo
     
 
 def nx_to_neo_nodes(graph, return_nodes=True, return_edges=True):
 
-    n_attributes = len(list(list(list(graph.nodes.data())[0][1].values())[0].keys())) # assumes the number and types of node attributes of the first node can be generalized to the others
-    
-    node_attributes = list(list(list(graph.nodes.data())[0][1].values())[0].keys())
-
     nx_nodes = list(graph.nodes.data())
     neo_nodes = []
 
-    
-
     for i in range(len(nx_nodes)):
+
+        n_attributes = len(list(list(list(graph.nodes.data())[i][1].values())[0].keys())) 
+        node_attributes = list(list(list(graph.nodes.data())[i][1].values())[0].keys())
 
         root_info = "CREATE " + "(" + "%s" + ":" + "%s" + " {" + "%s" + ":" + '"' + "%s" + '"'
         root_info = root_info % (re.sub(r'\W+','', nx_nodes[i][0]), list(nx_nodes[i][1].keys())[0], list(list(nx_nodes[i][1].values())[0].keys())[0], list(nx_nodes[i][1].values())[0]['name'])
@@ -81,6 +92,7 @@ def nx_to_neo_nodes(graph, return_nodes=True, return_edges=True):
         end_string = "}" + ")"
 
         additional_attributes = "" 
+        
         for j in range(1,n_attributes):
         
             attribute = "," + "%s" + ":" + '"' + "%s" + '"'
