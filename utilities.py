@@ -14,7 +14,9 @@ def point_lookup(polygon_dict, point):
         
         if result == True:
             return list(polygon_dict.keys())[i]
-            break 
+            break
+
+    return "None" 
        
 def closest_to(polygon_dict, point):
 
