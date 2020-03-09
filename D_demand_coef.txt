@@ -1,0 +1,2 @@
+['sales_volume_location_2016', 'neighborhood_avg_property_value', 'neighborhood_property_crimes', 'surrounding_neighborhood_avg_property_value', 'surrounding_neighborhood_property_crimes']
+[0.9317133788087207, -0.05389048407535676, -0.21656957369296354, 0.031990880285334006, 0.2202127995619555]
