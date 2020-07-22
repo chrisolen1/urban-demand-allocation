@@ -34,7 +34,7 @@ def closest_to(polygon_dict, point):
        
 # confirm intersection of two polygons
 
-def intersection(polygon_dict_1, polygon_name_1, polygon_dict_2, polygon_name_2):
+def intersection(polygon_dict_1=None, polygon_name_1=None, polygon_dict_2=None, polygon_name_2=None):
     
     shape_1 = Polygon(polygon_dict_1[polygon_name_1][0]) 
     shape_2 = Polygon(polygon_dict_2[polygon_name_2][0])
