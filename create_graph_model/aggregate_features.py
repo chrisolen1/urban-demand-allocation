@@ -20,54 +20,71 @@ def aggregate_features(features_dataframe, aggregate_function, geo_data_director
 	assert(aggregate_function == "count" or aggregate_function == "mean"), "\
 			aggregate function must be either count or mean"
 	# pull out unique aggregator categories
-	with open('{}/neighborhood_polys.json'.format(geo_data_directory),'r') as f:
+	with open('{}/neighborhood_reformatted.json'.format(geo_data_directory),'r') as f:
 		neighborhoods = json.load(f)
 	
-	with open('{}/tract_polys.json'.format(geo_data_directory),'r') as f:
+	with open('{}/tract_reformatted.json'.format(geo_data_directory),'r') as f:
 		tracts = json.load(f)
 
 	unique_neighborhoods = list(neighborhoods.keys())
 	unique_census_tracts = list(tracts.keys())
 	# determine features to retain in dataframe
 	features = list(features_to_aggregate) + ["neighborhood","tracts"]
-	features_dataframe = features_dataframe[features]
+	features_dataframe = features_dataframe[features] 
+
+	# remove rows from the socioeconomic data for which 'neighborhood' or 'tract' == 'None'
+	# otherwise, you'll get a key error when trying to match up with the shapefiles later 
+	if 'None' in list(features_dataframe["neighborhood"]):
+
+		features_dataframe = features_dataframe[features_dataframe['neighborhood'] != 'None']
+
+	if 'None' in list(features_dataframe["tracts"]):
+
+		features_dataframe = features_dataframe[features_dataframe['tracts'] != 'None']
 			   
 	if aggregate_function == "mean":
 		
 		# calculate aggregated figures for each neighborhood
 		neighborhood_aggregated = features_dataframe.groupby('neighborhood')\
 							 [list(features_to_aggregate)].mean()
-		# determine whether
+		# determine whether there are geographic entities in the json files that are not in the
+		# socioeconomic data
 		additionals = list(set(unique_neighborhoods) - set(list(neighborhood_aggregated.index)))
 		for i in additionals:
 			if i != np.nan:
-				neighborhood_aggregated.append(pd.Series(name=i))
+				neighborhood_aggregated = neighborhood_aggregated.append(pd.Series(name=i))
 		
 		# calculate aggregated features for each census tract    
 		census_tract_aggregated = features_dataframe.groupby('tracts')\
 							 [list(features_to_aggregate)].mean()
+		# determine whether there are geographic entities in the json files that are not in the
+		# socioeconomic data
 		additionals = list(set(unique_census_tracts) - set(list(census_tract_aggregated.index)))
 		for i in additionals:
 			if i != np.nan:
-				census_tract_aggregated.append(pd.Series(name=i))
+				census_tract_aggregated = census_tract_aggregated.append(pd.Series(name=i))
 		
 	elif aggregate_function == "count":
 		
 		# calculate aggregated figures for each neighborhood
 		neighborhood_aggregated = features_dataframe.groupby('neighborhood')\
 							 [list(features_to_aggregate)].count()
+		# determine whether there are geographic entities in the json files that are not in the
+		# socioeconomic data
 		additionals = list(set(unique_neighborhoods) - set(list(neighborhood_aggregated.index)))
 		for i in additionals:
 			if i != np.nan:
-				neighborhood_aggregated.append(pd.Series(name=i))
+				neighborhood_aggregated = neighborhood_aggregated.append(pd.Series(name=i))
 		
 		# calculate aggregated features for each census tract    
 		census_tract_aggregated = features_dataframe.groupby('tracts')\
 							 [list(features_to_aggregate)].count()
+		# determine whether there are geographic entities in the json files that are not in the
+		# socioeconomic data
 		additionals = list(set(unique_census_tracts) - set(list(census_tract_aggregated.index)))
 		for i in additionals:
 			if i != np.nan:
-				census_tract_aggregated.append(pd.Series(name=i))
+				census_tract_aggregated = census_tract_aggregated.append(pd.Series(name=i))
 		
 	return neighborhood_aggregated, census_tract_aggregated
 				
