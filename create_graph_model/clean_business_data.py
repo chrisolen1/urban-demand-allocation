@@ -33,10 +33,8 @@ cols=['year',
 bus = pd.read_csv("../../data/chi_bus.csv", sep='\t', names=cols, low_memory=False)
 
 # retain only model features
-model_features = ['abi','primary_naics_code','company','year','business_status_code','company_holding_status',
-           'census_tract','year_established',
-           'employee_size_location','sales_volume_location',
-           'latitude','longitude']
+model_features = ['abi','primary_naics_code','company','year','business_status_code','company_holding_status','year_established',
+           'employee_size_location','sales_volume_location','latitude','longitude']
 
 bus = bus[model_features]
 
