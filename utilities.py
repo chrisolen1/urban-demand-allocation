@@ -17,7 +17,11 @@ def point_lookup(polygon_dict, point):
 	Returns: Name of the locality to which the provided point corresponds, 
 			name will be one of the polygon_dict keys, else returns "None"
 	"""
-	
+	assert(isinstance(polygon_dict, dict)), "\
+			polygon_dict argument must be of type dict"
+
+	assert(isinstance(point, tuple)), "\
+			point argument must be of type tuple"
 	# convert to point object
 	point = Point(point) 
 	
@@ -42,8 +46,13 @@ def closest_to(polygon_dict, point):
 	:point: tuple of coordinates corresponding to the point of interest
 	Returns: name of the locality closest to the provided coordinate 
 	"""
+	assert(isinstance(polygon_dict, dict)), "\
+			polygon_dict argument must be of type dict"
 
-	point = Point(point) # point should be a tuple
+	assert(isinstance(point, tuple)), "\
+			point argument must be of type tuple"
+
+	point = Point(point) 
 	distances = []
 
 	for i in range(len(list(polygon_dict.keys()))):
@@ -69,7 +78,19 @@ def intersection(polygon_dict_1=None, polygon_name_1=None, polygon_dict_2=None, 
 	:polygon_name_2: name of second polygon with which to test intersection 
 	Returns; True if two polygons intersection, else False 
 	"""
-	
+
+	assert(isinstance(polygon_dict_1, dict)), "\
+			polygon_dict_1 argument must be of type dict"
+
+	assert(isinstance(polygon_dict_2, dict)), "\
+			polygon_dict_2 argument must be of type dict"
+
+	assert(isinstance(polygon_name_1, str)), "\
+			polygon_name_1 argument must be of type str"
+
+	assert(isinstance(polygon_name_2, str)), "\
+			polygon_name_2 argument must be of type str"
+
 	shape_1 = Polygon(polygon_dict_1[polygon_name_1][0]) 
 	shape_2 = Polygon(polygon_dict_2[polygon_name_2][0])
 	
