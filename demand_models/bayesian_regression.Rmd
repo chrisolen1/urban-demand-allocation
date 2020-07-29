@@ -1,0 +1,80 @@
+---
+title: "bayesian_regression"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(shinystan)
+library(HDInterval)
+library(rstan)
+```
+
+```{r}
+dataPath <- "/Users/chrisolen/Documents/uchicago_courses/optimization/project/urban-demand-allocation/demand_models"
+dat<-read.csv(paste(dataPath,"test.csv",sep="/"))
+head(dat)
+```
+
+
+
+```{r}
+modelString<-"
+data {
+    int<lower=1> Ntotal;
+    int<lower=1> Nx;
+    vector[Ntotal] y;
+    matrix[Ntotal, Nx] x;
+}
+transformed data {
+    real meanY;
+    real sdY;
+    vector[Ntotal] zy; // normalized
+    vector[Nx] meanX;
+    vector[Nx] sdX;
+    matrix[Ntotal, Nx] zx; // normalized
+    
+    meanY = mean(y);
+    sdY = sd(y);
+    zy = (y - meanY) / sdY;
+    for ( j in 1:Nx ) {
+        meanX[j] = mean(x[,j]);
+        sdX[j] = sd(x[,j]);
+        for ( i in 1:Ntotal ) {
+            zx[i,j] = ( x[i,j] - meanX[j] ) / sdX[j];
+        }
+    }
+}
+parameters {
+    real zbeta0;
+    real<lower=0> sigmaBeta;
+    vector[Nx] zbeta;
+    real<lower=0> nu;
+    real<lower=0> zsigma;
+}
+transformed parameters{
+    vector[Ntotal] zy_hat;
+    zy_hat = zbeta0 + zx * zbeta;
+}
+model {
+    zbeta0 ~ normal(0, 2);
+    sigmaBeta ~ gamma(2.3,1.3); // mode=(alpha-1)/beta, var=alpha/beta^2
+    zbeta  ~ student_t(1.0/30.0, 0, sigmaBeta);
+    nu ~ exponential(1/30.0);
+    zsigma ~ uniform(1.0E-5 , 1.0E+1);
+    zy ~ student_t(1+nu, zy_hat, zsigma);
+}
+generated quantities { 
+    // Transform to original scale:
+    real beta0; 
+    vector[Nx] beta;
+    real sigma;
+    // .* and ./ are element-wise product and divide
+    beta0 = zbeta0*sdY  + meanY - sdY * sum( zbeta .* meanX ./ sdX );
+    beta = sdY * ( zbeta ./ sdX );
+    sigma = zsigma * sdY;
+} "
+```
