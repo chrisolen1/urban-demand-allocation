@@ -1,0 +1,1463 @@
+---
+title: "bayesian_regression"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(shinystan)
+library(HDInterval)
+library(rstan)
+library(shinystan)
+library(bayesplot)
+```
+
+```{r}
+dataPath <- "/Users/chrisolen/Documents/uchicago_courses/optimization/project/urban-demand-allocation/demand_models"
+dat<-read.csv(paste(dataPath,"test.csv",sep="/"))
+head(dat)
+```
+
+```{r}
+x <- as.matrix(dat[,c(-1,-2,-3)])
+y <- dat[,1]
+Ntotal <- dim(x)[1]
+Nx <- dim(x)[2]
+dataListRegression <- list(Ntotal=Ntotal,
+                           y=y,
+                           x=x,
+                           Nx=Nx)
+```
+
+```{r}
+modelString <- "
+data { // variable declarations 
+    int<lower=1> Ntotal; // number of samples
+    int<lower=1> Nx; // number of covariates
+    vector[Ntotal] y; // all of the response instances
+    matrix[Ntotal, Nx] x; // matrix of covariates
+}
+transformed data { // standardized y and x values
+    // variable declarations
+    real meanY;
+    real sdY;
+    vector[Ntotal] zy; 
+    vector[Nx] meanX;
+    vector[Nx] sdX;
+    matrix[Ntotal, Nx] zx; 
+    // standardize variables
+    meanY = mean(y);
+    sdY = sd(y);
+    zy = (y - meanY) / sdY;
+    for ( j in 1:Nx ) {
+        meanX[j] = mean(x[,j]);
+        sdX[j] = sd(x[,j]);
+        for ( i in 1:Ntotal ) {
+            zx[i,j] = ( x[i,j] - meanX[j] ) / sdX[j];
+        }
+    }
+}
+parameters {
+    real zbeta0;
+    real<lower=0> sigmaBeta;
+    real<lower=0> nuBeta;
+    vector[Nx] zbeta;
+    real<lower=0> zsigma;
+    real<lower=0> nu;
+    real<lower=0> shapeSigmaBeta;
+    real<lower=0> scaleSigmaBeta;
+    real<lower=0> shapeSigma;
+    real<lower=0> scaleSigma;
+}
+transformed parameters {
+    vector[Ntotal] zy_hat;
+    zy_hat = zbeta0 + zx * zbeta;
+}
+model {
+    zbeta0 ~ normal(0,5); // draw standardized beta0 from normal
+    shapeSigmaBeta ~ uniform(1.0E-5, 1.0E1);
+    scaleSigmaBeta ~ uniform(1.0E-5, 1.0E1);
+    sigmaBeta ~ gamma(shapeSigmaBeta,scaleSigmaBeta); // draw zbeta tdist var from gamma
+    nuBeta ~ uniform(1.0E-5, 1.0E10); // draw zbeta tdist nu from exponential
+    zbeta ~ student_t(nuBeta, 0, sigmaBeta); // draw standardized betas from student_t
+    shapeSigma ~ uniform(1.0E-5, 1.0E10);
+    scaleSigma ~ uniform(1.0E-5, 1.0E10);
+    zsigma ~ gamma(shapeSigma , scaleSigma); // draw zy tdist var from uniform
+    nu ~ uniform(1.0E-5, 1.0E10); // draw zy tdist nu from exponential
+    zy ~ student_t(nu, zy_hat, zsigma); // draw standardized y from tdist with mean zyhat
+}
+generated quantities { // transform to original scale
+    // declare re-scaled variables
+    real beta0; 
+    vector[Nx] beta;
+    real sigma;
+    // re-scale variables
+    // note: .* and ./ are element-wise product and divide
+    beta = sdY * ( zbeta ./ sdX );
+    beta0 = zbeta0*sdY  + meanY - sdY * sum( zbeta .* meanX ./ sdX );
+    sigma = zsigma * sdY;
+} "
+```
+
+```{r}
+RobustMultipleRegressionDso <- stan_model( model_code=modelString )
+```
+
+```{r}
+fit <- sampling(RobustMultipleRegressionDso,
+               data=dataListRegression,
+               pars=c('beta0', 'beta', 'sigma','sigmaBeta', 'shapeSigmaBeta', 'scaleSigmaBeta', 'shapeSigma', 'scaleSigma', 'nu', 'nuBeta'),
+               iter=10000, chains = 4, cores = 4,
+               control = list(adapt_delta = .9999, max_treedepth = 10))
+
+```
+
+```{r}
+posterior <- as.array(fit)
+lp <- log_posterior(fit)
+np <- nuts_params(fit)
+rhats <- rhat(fit)
+ratios <- neff_ratio(fit)
+params <- colnames(as.matrix(fit))
+x
+```
+
+```{r}
+color_scheme_set("darkgray")
+mcmc_parcoord(posterior, np = np, pars = params[-length(params)])
+mcmc_parcoord(posterior, np = np, pars = params[c(-1,-length(params))])
+mcmc_parcoord(posterior, np = np, pars = params[2:5])
+mcmc_parcoord(posterior, np = np, pars = params[6:10])
+
+
+```
+
+```{r}
+mcmc_pairs(posterior, np = np, pars = params[2:5], 
+           off_diag_args = list(size = 0.75))
+```
+
+```{r}
+mcmc_pairs(posterior, np = np, pars = params[6:12], 
+           off_diag_args = list(size = 0.75))
+```
+
+```{r}
+scatter <- mcmc_scatter(
+  posterior, 
+  pars = params[2:5],
+  np = np, 
+  size = 1
+)
+scatter
+```
+
+```{r}
+color_scheme_set("mix-brightblue-gray")
+mcmc_trace(posterior, np = np, pars = params[6:12]) + 
+  xlab("Post-warmup iteration")
+```
+
+```{r}
+color_scheme_set("red")
+mcmc_nuts_energy(np)
+```
+
+```{r}
+color_scheme_set("brightblue") # see help("color_scheme_set")
+mcmc_rhat(rhats)
+```
+
+```{r}
+stan_ac(fit)
+```
+
+```{r}
+mcmc_neff(ratios, size = 2)
+```
+
+
+```{r}
+
+stan_dens(fit)
+plot(fit)
+
+```
+
+```{r}
+#shinystan(fit)
+saveRDS(fit, "fit.rds")
+```
+
+
+```{r}
+modelString1 <- "
+data { // variable declarations 
+    int<lower=1> Ntotal; // number of samples
+    int<lower=1> Nx; // number of covariates
+    vector[Ntotal] y; // all of the response instances
+    matrix[Ntotal, Nx] x; // matrix of covariates
+}
+transformed data { // standardized y and x values
+    // variable declarations
+    real meanY;
+    real sdY;
+    vector[Ntotal] zy; 
+    vector[Nx] meanX;
+    vector[Nx] sdX;
+    matrix[Ntotal, Nx] zx; 
+    // standardize variables
+    meanY = mean(y);
+    sdY = sd(y);
+    zy = (y - meanY) / sdY;
+    for ( j in 1:Nx ) {
+        meanX[j] = mean(x[,j]);
+        sdX[j] = sd(x[,j]);
+        for ( i in 1:Ntotal ) {
+            zx[i,j] = ( x[i,j] - meanX[j] ) / sdX[j];
+        }
+    }
+}
+parameters {
+    real zbeta0;
+    vector[Nx] zbeta;
+}
+transformed parameters {
+    vector[Ntotal] zy_hat;
+    zy_hat = zbeta0 + zx * zbeta;
+}
+model {
+    zbeta0 ~ normal(0,1); // draw standardized beta0 from normal
+    zbeta ~ normal(0,1); // draw standardized betas from normal
+    zy ~ normal(zy_hat,1); // draw standardized y from normal with mean zyhat
+}
+generated quantities { // transform to original scale
+    // declare re-scaled variables
+    real beta0; 
+    vector[Nx] beta;
+    real sigma;
+    // re-scale variables
+    // note: .* and ./ are element-wise product and divide
+    beta = sdY * ( zbeta ./ sdX );
+    beta0 = zbeta0*sdY  + meanY - sdY * sum( zbeta .* meanX ./ sdX );
+    sigma = 1 * sdY;
+} "
+```
+
+```{r}
+RobustMultipleRegressionDso1 <- stan_model( model_code=modelString1 )
+```
+
+```{r}
+fit1  <- sampling(RobustMultipleRegressionDso1,
+               data=dataListRegression,
+               pars=c('beta0', 'beta'),
+               iter=20000, chains = 4, cores = 4,
+               control = list(adapt_delta = .9999, max_treedepth = 15))
+
+```
+
+```{r}
+posterior <- as.array(fit1)
+lp <- log_posterior(fit1)
+np <- nuts_params(fit1)
+rhats <- rhat(fit1)
+ratios <- neff_ratio(fit1)
+params <- colnames(as.matrix(fit1))
+feature_names <- colnames(x)
+```
+
+```{r}
+plot(fit1,pars=c("beta"))
+```
+
+```{r}
+color_scheme_set("darkgray")
+mcmc_parcoord(posterior, np = np, pars = params[2:5])
+
+```
+
+```{r}
+mcmc_pairs(posterior, np = np, 
+           off_diag_args = list(size = 0.75))
+```
+
+
+```{r}
+scatter <- mcmc_scatter(posterior, 
+  pars = params[c(2,4)],
+  np = np, 
+  size = 1)
+scatter
+```
+
+```{r}
+color_scheme_set("mix-brightblue-gray")
+mcmc_trace(posterior, np = np) + 
+  xlab("Post-warmup iteration")
+```
+
+```{r}
+color_scheme_set("red")
+mcmc_nuts_energy(np)
+```
+
+```{r}
+color_scheme_set("brightblue") # see help("color_scheme_set")
+mcmc_rhat(rhats)
+```
+
+```{r}
+stan_ac(fit1)
+```
+
+```{r}
+mcmc_neff(ratios, size = 2)
+```
+
+
+```{r}
+stan_dens(fit1)
+```
+
+```{r}
+#shinystan(fit)
+saveRDS(fit1, "fit1.rds")
+```
+
+
+```{r}
+modelString2 <- "
+data { // variable declarations 
+    int<lower=1> Ntotal; // number of samples
+    int<lower=1> Nx; // number of covariates
+    vector[Ntotal] y; // all of the response instances
+    matrix[Ntotal, Nx] x; // matrix of covariates
+}
+transformed data { // standardized y and x values
+    // variable declarations
+    real meanY;
+    real sdY;
+    vector[Ntotal] zy; 
+    vector[Nx] meanX;
+    vector[Nx] sdX;
+    matrix[Ntotal, Nx] zx; 
+    // standardize variables
+    meanY = mean(y);
+    sdY = sd(y);
+    zy = (y - meanY) / sdY;
+    for ( j in 1:Nx ) {
+        meanX[j] = mean(x[,j]);
+        sdX[j] = sd(x[,j]);
+        for ( i in 1:Ntotal ) {
+            zx[i,j] = ( x[i,j] - meanX[j] ) / sdX[j];
+        }
+    }
+}
+parameters {
+    real zbeta0;
+    vector[Nx] zbeta;
+}
+transformed parameters {
+    vector[Ntotal] zy_hat;
+    zy_hat = zbeta0 + zx * zbeta;
+}
+model {
+    zbeta0 ~ normal(0,1); // draw standardized beta0 from normal
+    zbeta ~ normal(0,1); // draw standardized betas from normal
+    zy ~ student_t(1, zy_hat, 1); // draw standardized y from normal with mean zyhat
+}
+generated quantities { // transform to original scale
+    // declare re-scaled variables
+    real beta0; 
+    vector[Nx] beta;
+    real sigma;
+    // re-scale variables
+    // note: .* and ./ are element-wise product and divide
+    beta = sdY * ( zbeta ./ sdX );
+    beta0 = zbeta0*sdY  + meanY - sdY * sum( zbeta .* meanX ./ sdX );
+    sigma = 1 * sdY;
+} "
+```
+
+```{r}
+RobustMultipleRegressionDso2 <- stan_model( model_code=modelString2 )
+```
+
+```{r}
+fit2  <- sampling(RobustMultipleRegressionDso2,
+               data=dataListRegression,
+               pars=c('beta0', 'beta'),
+               iter=20000, chains = 4, cores = 4,
+               control = list(adapt_delta = .9999, max_treedepth = 15))
+
+```
+
+```{r}
+posterior <- as.array(fit2)
+lp <- log_posterior(fit2)
+np <- nuts_params(fit2)
+rhats <- rhat(fit2)
+ratios <- neff_ratio(fit2)
+params <- colnames(as.matrix(fit2))
+feature_names <- colnames(x)
+```
+
+```{r}
+plot(fit2,pars=c("beta"))
+#hdi(as.matrix(fit2)[,5])
+```
+
+```{r}
+color_scheme_set("darkgray")
+mcmc_parcoord(posterior, np = np, pars = params[2:5])
+
+```
+
+```{r}
+mcmc_pairs(posterior, np = np, 
+           off_diag_args = list(size = 0.75))
+```
+
+
+```{r}
+scatter <- mcmc_scatter(posterior, 
+  pars = params[c(2,4)],
+  np = np, 
+  size = 1)
+scatter
+```
+
+```{r}
+color_scheme_set("mix-brightblue-gray")
+mcmc_trace(posterior, np = np) + 
+  xlab("Post-warmup iteration")
+```
+
+```{r}
+color_scheme_set("red")
+mcmc_nuts_energy(np)
+```
+
+```{r}
+color_scheme_set("brightblue") # see help("color_scheme_set")
+mcmc_rhat(rhats)
+```
+
+```{r}
+stan_ac(fit2)
+```
+
+```{r}
+mcmc_neff(ratios, size = 2)
+```
+
+
+```{r}
+stan_dens(fit2)
+```
+
+```{r}
+#shinystan(fit)
+saveRDS(fit2, "fit2.rds")
+```
+
+```{r}
+modelString3 <- "
+data { // variable declarations 
+    int<lower=1> Ntotal; // number of samples
+    int<lower=1> Nx; // number of covariates
+    vector[Ntotal] y; // all of the response instances
+    matrix[Ntotal, Nx] x; // matrix of covariates
+}
+transformed data { // standardized y and x values
+    // variable declarations
+    real meanY;
+    real sdY;
+    vector[Ntotal] zy; 
+    vector[Nx] meanX;
+    vector[Nx] sdX;
+    matrix[Ntotal, Nx] zx; 
+    // standardize variables
+    meanY = mean(y);
+    sdY = sd(y);
+    zy = (y - meanY) / sdY;
+    for ( j in 1:Nx ) {
+        meanX[j] = mean(x[,j]);
+        sdX[j] = sd(x[,j]);
+        for ( i in 1:Ntotal ) {
+            zx[i,j] = ( x[i,j] - meanX[j] ) / sdX[j];
+        }
+    }
+}
+parameters {
+    real zbeta0;
+    vector[Nx] zbeta;
+}
+transformed parameters {
+    vector[Ntotal] zy_hat;
+    zy_hat = zbeta0 + zx * zbeta;
+}
+model {
+    zbeta0 ~ normal(0,1); // draw standardized beta0 from normal
+    zbeta ~ normal(0,1); // draw standardized betas from normal
+    // response variable
+    zy ~ student_t(1/30.0, zy_hat, 1); // draw standardized y from normal with mean zyhat
+}
+generated quantities { // transform to original scale
+    // declare re-scaled variables
+    real beta0; 
+    vector[Nx] beta;
+    real sigma;
+    // re-scale variables
+    // note: .* and ./ are element-wise product and divide
+    beta = sdY * ( zbeta ./ sdX );
+    beta0 = zbeta0*sdY  + meanY - sdY * sum( zbeta .* meanX ./ sdX );
+    sigma = 1 * sdY;
+} "
+```
+
+```{r}
+RobustMultipleRegressionDso3 <- stan_model( model_code=modelString3 )
+```
+
+```{r}
+fit3  <- sampling(RobustMultipleRegressionDso3,
+               data=dataListRegression,
+               pars=c('beta0', 'beta'),
+               iter=20000, chains = 4, cores = 4,
+               control = list(adapt_delta = .9999, max_treedepth = 15))
+
+```
+
+```{r}
+posterior <- as.array(fit3)
+lp <- log_posterior(fit3)
+np <- nuts_params(fit3)
+rhats <- rhat(fit3)
+ratios <- neff_ratio(fit3)
+params <- colnames(as.matrix(fit3))
+feature_names <- colnames(x)
+```
+
+```{r}
+plot(fit3,pars=c("beta"))
+#hdi(as.matrix(fit2)[,5])
+```
+
+```{r}
+color_scheme_set("darkgray")
+mcmc_parcoord(posterior, np = np, pars = params[2:5])
+
+```
+
+```{r}
+mcmc_pairs(posterior, np = np, 
+           off_diag_args = list(size = 0.75))
+```
+
+
+```{r}
+scatter <- mcmc_scatter(posterior, 
+  pars = params[c(2,4)],
+  np = np, 
+  size = 1)
+scatter
+```
+
+```{r}
+color_scheme_set("mix-brightblue-gray")
+mcmc_trace(posterior, np = np) + 
+  xlab("Post-warmup iteration")
+```
+
+```{r}
+color_scheme_set("red")
+mcmc_nuts_energy(np)
+```
+
+```{r}
+color_scheme_set("brightblue") # see help("color_scheme_set")
+mcmc_rhat(rhats)
+```
+
+```{r}
+stan_ac(fit3)
+```
+
+```{r}
+mcmc_neff(ratios, size = 2)
+```
+
+
+```{r}
+stan_dens(fit3)
+```
+
+```{r}
+#shinystan(fit)
+saveRDS(fit3, "fit3.rds")
+```
+
+```{r}
+modelString4 <- "
+data { 
+    int<lower=1> Ntotal; 
+    int<lower=1> Nx; 
+    vector[Ntotal] y; 
+    matrix[Ntotal, Nx] x; 
+}
+transformed data { 
+    real meanY;
+    real sdY;
+    vector[Ntotal] zy; 
+    vector[Nx] meanX;
+    vector[Nx] sdX;
+    matrix[Ntotal, Nx] zx; 
+    meanY = mean(y);
+    sdY = sd(y);
+    zy = (y - meanY) / sdY;
+    for ( j in 1:Nx ) {
+        meanX[j] = mean(x[,j]);
+        sdX[j] = sd(x[,j]);
+        for ( i in 1:Ntotal ) {
+            zx[i,j] = ( x[i,j] - meanX[j] ) / sdX[j];
+        }
+    }
+}
+
+parameters {
+    real zbeta0;
+    vector[Nx] zbeta;
+    real<lower=0> sigmaBeta;
+}
+model {
+    zbeta0 ~ normal(0,1); 
+    sigmaBeta ~ gamma(2.3,1.3); // mode=(alpha-1)/beta, var=alpha/beta^2
+    zbeta ~ student_t(1.0/30.0,0,sigmaBeta); 
+    zy ~ normal(zbeta0 + zx * zbeta, 1); 
+}
+generated quantities { 
+    real beta0; 
+    vector[Nx] beta;
+    beta = sdY * ( zbeta ./ sdX );
+    beta0 = zbeta0 * sdY  + meanY - sdY * sum( zbeta .* meanX ./ sdX );
+} "
+```
+
+
+
+```{r}
+RobustMultipleRegressionDso4 <- stan_model( model_code=modelString4 )
+```
+
+```{r}
+fit4  <- sampling(RobustMultipleRegressionDso4,
+               data=dataListRegression,
+               pars=c('beta0', 'beta', 'zbeta0','zbeta','sigmaBeta'),
+               iter=10000, chains = 2, cores = 2,
+               control = list(adapt_delta = .9999, max_treedepth = 15))
+
+```
+
+```{r}
+posterior <- as.array(fit4)
+lp <- log_posterior(fit4)
+np <- nuts_params(fit4)
+rhats <- rhat(fit4)
+ratios <- neff_ratio(fit4)
+params <- colnames(as.matrix(fit4))
+feature_names <- colnames(x)
+plot(fit4,pars=c("beta"))
+hdi(as.matrix(fit4)[,3])
+hdi(as.matrix(fit4)[,5])
+```
+
+
+```{r}
+color_scheme_set("darkgray")
+mcmc_parcoord(posterior, np = np, pars = params[2:5])
+
+```
+
+```{r}
+mcmc_pairs(posterior, np = np, 
+           off_diag_args = list(size = 0.75))
+```
+
+
+```{r}
+scatter <- mcmc_scatter(posterior, 
+  pars = params[c(2,4)],
+  np = np, 
+  size = 1)
+scatter
+```
+
+```{r}
+color_scheme_set("mix-brightblue-gray")
+mcmc_trace(posterior, np = np) + 
+  xlab("Post-warmup iteration")
+```
+
+```{r}
+color_scheme_set("red")
+mcmc_nuts_energy(np)
+```
+
+```{r}
+color_scheme_set("brightblue") # see help("color_scheme_set")
+mcmc_rhat(rhats)
+```
+
+```{r}
+stan_ac(fit4)
+```
+
+```{r}
+mcmc_neff(ratios, size = 2)
+```
+
+
+```{r}
+stan_dens(fit4)
+```
+
+```{r}
+#shinystan(fit)
+saveRDS(fit4, "fit4.rds")
+```
+
+```{r}
+modelString5 <- "
+data { 
+    int<lower=1> Ntotal; 
+    int<lower=1> Nx; 
+    vector[Ntotal] y; 
+    matrix[Ntotal, Nx] x; 
+}
+transformed data { 
+    real meanY;
+    real sdY;
+    vector[Ntotal] zy; 
+    vector[Nx] meanX;
+    vector[Nx] sdX;
+    matrix[Ntotal, Nx] zx; 
+    meanY = mean(y);
+    sdY = sd(y);
+    zy = (y - meanY) / sdY;
+    for ( j in 1:Nx ) {
+        meanX[j] = mean(x[,j]);
+        sdX[j] = sd(x[,j]);
+        for ( i in 1:Ntotal ) {
+            zx[i,j] = ( x[i,j] - meanX[j] ) / sdX[j];
+        }
+    }
+}
+
+parameters {
+    real zbeta0;
+    vector[Nx] zbeta;
+    vector<lower=0>[Nx] sigmaBeta;
+}
+model {
+    zbeta0 ~ normal(0,1); 
+    sigmaBeta ~ gamma(2.3,1.3); // mode=(alpha-1)/beta, var=alpha/beta^2
+    zbeta ~ student_t(1.0/30.0,0,sigmaBeta); 
+    zy ~ normal(zbeta0 + zx * zbeta, 1); 
+}
+generated quantities { 
+    real beta0; 
+    vector[Nx] beta;
+    beta = sdY * ( zbeta ./ sdX );
+    beta0 = zbeta0 * sdY  + meanY - sdY * sum( zbeta .* meanX ./ sdX );
+} "
+```
+
+
+
+```{r}
+RobustMultipleRegressionDso5 <- stan_model( model_code=modelString5 )
+```
+
+```{r}
+fit5  <- sampling(RobustMultipleRegressionDso5,
+               data=dataListRegression,
+               pars=c('beta0', 'beta','zbeta0','zbeta','sigmaBeta'),
+               iter=10000, chains = 2, cores = 2,
+               control = list(adapt_delta = .9999, max_treedepth = 15))
+
+```
+
+```{r}
+posterior <- as.array(fit5)
+lp <- log_posterior(fit5)
+np <- nuts_params(fit5)
+rhats <- rhat(fit5)
+ratios <- neff_ratio(fit5)
+params <- colnames(as.matrix(fit5))
+feature_names <- colnames(x)
+plot(fit5,pars=c("beta"))
+hdi(as.matrix(fit5)[,3])
+hdi(as.matrix(fit5)[,5])
+
+```
+
+
+```{r}
+color_scheme_set("darkgray")
+mcmc_parcoord(posterior, np = np, pars = params[2:5])
+mcmc_parcoord(posterior, np = np, pars = params[6:10])
+mcmc_parcoord(posterior, np = np, pars = params[11:14])
+
+
+```
+
+```{r}
+mcmc_pairs(posterior, np = np, 
+           off_diag_args = list(size = 0.75), pars = params[1:5])
+mcmc_pairs(posterior, np = np, 
+           off_diag_args = list(size = 0.75), pars = params[11:14])
+```
+
+
+```{r}
+scatter <- mcmc_scatter(posterior, 
+  pars = params[c(2,4)],
+  np = np, 
+  size = 1)
+scatter
+```
+
+```{r}
+color_scheme_set("mix-brightblue-gray")
+mcmc_trace(posterior, np = np) + 
+  xlab("Post-warmup iteration")
+```
+
+```{r}
+color_scheme_set("red")
+mcmc_nuts_energy(np)
+```
+
+```{r}
+color_scheme_set("brightblue") # see help("color_scheme_set")
+mcmc_rhat(rhats)
+```
+
+```{r}
+stan_ac(fit5)
+stan_ac(fit5, pars = params[11:14])
+```
+
+```{r}
+mcmc_neff(ratios, size = 2)
+```
+
+
+```{r}
+stan_dens(fit5)
+stan_dens(fit5, pars = params[11:14])
+```
+
+```{r}
+#shinystan(fit)
+saveRDS(fit5, "fit4.rds")
+```
+
+```{r}
+modelString6 <- "
+data { 
+    int<lower=1> Ntotal; 
+    int<lower=1> Nx; 
+    vector[Ntotal] y; 
+    matrix[Ntotal, Nx] x; 
+}
+transformed data { 
+    real meanY;
+    real sdY;
+    vector[Ntotal] zy; 
+    vector[Nx] meanX;
+    vector[Nx] sdX;
+    matrix[Ntotal, Nx] zx; 
+    meanY = mean(y);
+    sdY = sd(y);
+    zy = (y - meanY) / sdY;
+    for ( j in 1:Nx ) {
+        meanX[j] = mean(x[,j]);
+        sdX[j] = sd(x[,j]);
+        for ( i in 1:Ntotal ) {
+            zx[i,j] = ( x[i,j] - meanX[j] ) / sdX[j];
+        }
+    }
+}
+
+parameters {
+    real zbeta0;
+    vector[Nx] zbeta;
+    real<lower=0> sigmaBeta0;
+    vector<lower=0>[Nx] sigmaBeta;
+    
+}
+model {
+    sigmaBeta0 ~ gamma(3,1); // mode=(kappa-1)/theta, var=kappa/theta^2
+    zbeta0 ~ student_t(1.0/30.0,0,sigmaBeta0); 
+    sigmaBeta ~ gamma(3,1); // mode=(kappa-1)/theta, var=kappa/theta^2
+    zbeta ~ student_t(1.0/30.0,0,sigmaBeta); 
+    zy ~ normal(zbeta0 + zx * zbeta, 1); 
+}
+generated quantities { 
+    real beta0; 
+    vector[Nx] beta;
+    beta = sdY * ( zbeta ./ sdX );
+    beta0 = zbeta0 * sdY  + meanY - sdY * sum( zbeta .* meanX ./ sdX );
+} "
+```
+
+
+
+```{r}
+RobustMultipleRegressionDso6 <- stan_model( model_code=modelString6 )
+```
+
+```{r}
+fit6  <- sampling(RobustMultipleRegressionDso6,
+               data=dataListRegression,
+               pars=c('beta0', 'beta','zbeta0','zbeta','sigmaBeta0','sigmaBeta'),
+               iter=5000, chains = 4, cores = 4,
+               control = list(adapt_delta = .9999, max_treedepth = 13))
+
+```
+
+```{r}
+posterior <- as.array(fit6)
+lp <- log_posterior(fit6)
+np <- nuts_params(fit6)
+rhats <- rhat(fit6)
+ratios <- neff_ratio(fit6)
+params <- colnames(as.matrix(fit6))
+feature_names <- colnames(x)
+plot(fit6,pars=c("beta"))
+hdi(as.matrix(fit6)[,3])
+hdi(as.matrix(fit6)[,5])
+
+```
+
+
+```{r}
+color_scheme_set("darkgray")
+mcmc_parcoord(posterior, np = np, pars = params[2:5])
+mcmc_parcoord(posterior, np = np, pars = params[6:10])
+mcmc_parcoord(posterior, np = np, pars = params[11:14])
+
+
+```
+
+```{r}
+mcmc_pairs(posterior, np = np, 
+           off_diag_args = list(size = 0.75), pars = params[1:5])
+mcmc_pairs(posterior, np = np, 
+           off_diag_args = list(size = 0.75), pars = params[11:14])
+
+```
+
+
+```{r}
+scatter <- mcmc_scatter(posterior, 
+  pars = params[c(2,4)],
+  np = np, 
+  size = 1)
+scatter
+```
+
+```{r}
+color_scheme_set("mix-brightblue-gray")
+mcmc_trace(posterior, np = np) + 
+  xlab("Post-warmup iteration")
+```
+
+```{r}
+color_scheme_set("red")
+mcmc_nuts_energy(np)
+```
+
+```{r}
+color_scheme_set("brightblue") # see help("color_scheme_set")
+mcmc_rhat(rhats)
+```
+
+```{r}
+stan_ac(fit6)
+stan_ac(fit6, pars = params[11:14])
+
+```
+
+```{r}
+mcmc_neff(ratios, size = 2)
+```
+
+
+```{r}
+stan_dens(fit6)
+stan_dens(fit6, pars = params[11:14])
+
+
+```
+
+```{r}
+#shinystan(fit)
+saveRDS(fit6, "fit6.rds")
+```
+
+```{r}
+modelString7 <- "
+data { 
+    int<lower=1> Ntotal; 
+    int<lower=1> Nx; 
+    vector[Ntotal] y; 
+    matrix[Ntotal, Nx] x; 
+}
+transformed data { 
+    real meanY;
+    real sdY;
+    vector[Ntotal] zy; 
+    vector[Nx] meanX;
+    vector[Nx] sdX;
+    matrix[Ntotal, Nx] zx; 
+    meanY = mean(y);
+    sdY = sd(y);
+    zy = (y - meanY) / sdY;
+    for ( j in 1:Nx ) {
+        meanX[j] = mean(x[,j]);
+        sdX[j] = sd(x[,j]);
+        for ( i in 1:Ntotal ) {
+            zx[i,j] = ( x[i,j] - meanX[j] ) / sdX[j];
+        }
+    }
+}
+parameters {
+    real zbeta0;
+    vector[Nx] zbeta;
+    real<lower=0> sigmaBeta0;
+    vector<lower=0>[Nx] sigmaBeta;
+    real<lower=0> zsigma;
+}
+model {
+    sigmaBeta0 ~ gamma(3,1); // mode=(kappa-1)/theta, var=kappa/theta^2
+    zbeta0 ~ student_t(1.0/30.0,0,sigmaBeta0); 
+    sigmaBeta ~ gamma(3,1); // mode=(kappa-1)/theta, var=kappa/theta^2
+    zbeta ~ student_t(1.0/30.0,0,sigmaBeta);
+    zsigma ~ gamma(3,1);
+    for (i in 1:Ntotal) {
+      zy[i] ~ normal(zbeta0 + zx[i,] * zbeta, zsigma); 
+    }
+}
+generated quantities { 
+    real beta0; 
+    vector[Nx] beta;
+    beta = sdY * ( zbeta ./ sdX );
+    beta0 = zbeta0 * sdY  + meanY - sdY * sum( zbeta .* meanX ./ sdX );
+} "
+```
+
+
+```{r}
+RobustMultipleRegressionDso7 <- stan_model( model_code=modelString7 )
+```
+
+```{r}
+fit7  <- sampling(RobustMultipleRegressionDso7,
+               data=dataListRegression,
+               pars=c('beta0', 'beta','zbeta0','zbeta','sigmaBeta0','sigmaBeta','zsigma'),
+               iter=10000, chains = 4, cores = 4,
+               control = list(adapt_delta = .80, max_treedepth = 15))
+
+```
+
+```{r}
+posterior <- as.array(fit7)
+lp <- log_posterior(fit7)
+np <- nuts_params(fit7)
+rhats <- rhat(fit7)
+ratios <- neff_ratio(fit7)
+params <- colnames(as.matrix(fit7))
+feature_names <- colnames(x)
+plot(fit7,pars=c("beta"))
+hdi(as.matrix(fit7)[,3])
+hdi(as.matrix(fit7)[,5])
+
+```
+
+
+```{r}
+color_scheme_set("darkgray")
+mcmc_parcoord(posterior, np = np, pars = params[2:5])
+mcmc_parcoord(posterior, np = np, pars = params[6:10])
+mcmc_parcoord(posterior, np = np, pars = params[11:14])
+
+
+```
+
+```{r}
+mcmc_pairs(posterior, np = np, 
+           off_diag_args = list(size = 0.75), pars = params[1:5])
+mcmc_pairs(posterior, np = np, 
+           off_diag_args = list(size = 0.75), pars = params[11:14])
+mcmc_pairs(posterior, np = np, 
+           off_diag_args = list(size = 0.75), pars = params[15:17])
+```
+
+
+```{r}
+scatter <- mcmc_scatter(posterior, 
+  pars = params[c(2,4)],
+  np = np, 
+  size = 1)
+scatter
+```
+
+```{r}
+color_scheme_set("mix-brightblue-gray")
+mcmc_trace(posterior, np = np) + 
+  xlab("Post-warmup iteration")
+```
+
+```{r}
+color_scheme_set("red")
+mcmc_nuts_energy(np)
+```
+
+```{r}
+color_scheme_set("brightblue") # see help("color_scheme_set")
+mcmc_rhat(rhats)
+```
+
+```{r}
+stan_ac(fit7)
+stan_ac(fit7, pars = params[11:14])
+stan_ac(fit7, pars = params[15:17])
+```
+
+```{r}
+mcmc_neff(ratios, size = 2)
+```
+
+
+```{r}
+stan_dens(fit7)
+stan_dens(fit7, pars = params[11:14])
+stan_dens(fit7, pars = params[15:17])
+
+```
+
+```{r}
+#shinystan(fit)
+saveRDS(fit7, "fit6.rds")
+```
+
+```{r}
+modelString8 <- "
+data { 
+    int<lower=1> Ntotal; 
+    int<lower=1> Nx; 
+    vector[Ntotal] y; 
+    matrix[Ntotal, Nx] x; 
+}
+transformed data { 
+    real meanY;
+    real sdY;
+    vector[Ntotal] zy; 
+    vector[Nx] meanX;
+    vector[Nx] sdX;
+    matrix[Ntotal, Nx] zx; 
+    meanY = mean(y);
+    sdY = sd(y);
+    zy = (y - meanY) / sdY;
+    for ( j in 1:Nx ) {
+        meanX[j] = mean(x[,j]);
+        sdX[j] = sd(x[,j]);
+        for ( i in 1:Ntotal ) {
+            zx[i,j] = ( x[i,j] - meanX[j] ) / sdX[j];
+        }
+    }
+}
+parameters {
+    real zbeta0;
+    vector[Nx] zbeta;
+    real<lower=0> sigmaBeta0;
+    vector<lower=0>[Nx] sigmaBeta;
+    real<lower=0> zsigma;
+    real<lower=0> tau;
+    real<lower=0> nu;
+}
+model {
+    sigmaBeta0 ~ gamma(3.0, 2.0); // mode=(kappa-1)/theta, var=kappa/theta^2
+    zbeta0 ~ student_t(1.0/30.0,0,sigmaBeta0); 
+    sigmaBeta ~ gamma(3.0, 2.0); // mode=(kappa-1)/theta, var=kappa/theta^2
+    zbeta ~ student_t(1.0/30.0,0,sigmaBeta);
+    zsigma ~ gamma(3,1);
+    nu ~ gamma(3.0, 2.0);
+    tau ~ gamma(nu/2.0,nu/2.0);
+    zy ~ normal(zbeta0 + zx * zbeta, 1/sqrt(tau)); 
+}
+generated quantities { 
+    real beta0; 
+    vector[Nx] beta;
+    beta = sdY * ( zbeta ./ sdX );
+    beta0 = zbeta0 * sdY  + meanY - sdY * sum( zbeta .* meanX ./ sdX );
+} "
+```
+
+
+```{r}
+RobustMultipleRegressionDso8 <- stan_model( model_code=modelString8 )
+```
+
+```{r}
+fit8  <- sampling(RobustMultipleRegressionDso8,
+               data=dataListRegression,
+               pars=c('beta0', 'beta','zbeta0','zbeta','sigmaBeta0','sigmaBeta','zsigma', 'nu', 'tau'),
+               iter=25000, chains = 8, cores = 4,
+               control = list(adapt_delta = .80, max_treedepth = 20))
+
+```
+
+```{r}
+posterior <- as.array(fit8)
+lp <- log_posterior(fit8)
+np <- nuts_params(fit8)
+rhats <- rhat(fit8)
+ratios <- neff_ratio(fit8)
+params <- colnames(as.matrix(fit8))
+feature_names <- colnames(x)
+plot(fit8,pars=c("beta"))
+hdi(as.matrix(fit8)[,3])
+hdi(as.matrix(fit8)[,5])
+
+```
+
+
+```{r}
+color_scheme_set("darkgray")
+mcmc_parcoord(posterior, np = np, pars = params[2:5])
+mcmc_parcoord(posterior, np = np, pars = params[6:10])
+mcmc_parcoord(posterior, np = np, pars = params[11:14])
+
+
+```
+
+```{r}
+mcmc_pairs(posterior, np = np, 
+           off_diag_args = list(size = 0.75), pars = params[1:5])
+mcmc_pairs(posterior, np = np, 
+           off_diag_args = list(size = 0.75), pars = params[11:14])
+mcmc_pairs(posterior, np = np, 
+           off_diag_args = list(size = 0.75), pars = params[15:18])
+```
+
+
+```{r}
+scatter <- mcmc_scatter(posterior, 
+  pars = params[c(2,4)],
+  np = np, 
+  size = 1)
+scatter
+```
+
+```{r}
+color_scheme_set("mix-brightblue-gray")
+mcmc_trace(posterior, np = np) + 
+  xlab("Post-warmup iteration")
+```
+
+```{r}
+color_scheme_set("red")
+mcmc_nuts_energy(np)
+```
+
+```{r}
+color_scheme_set("brightblue") # see help("color_scheme_set")
+mcmc_rhat(rhats)
+```
+
+```{r}
+stan_ac(fit8)
+stan_ac(fit8, pars = params[11:14])
+stan_ac(fit8, pars = params[15:17])
+```
+
+```{r}
+mcmc_neff(ratios, size = 2)
+```
+
+
+```{r}
+stan_dens(fit8)
+stan_dens((fit8), pars = params[9:14])
+stan_dens((fit8), pars = params[15:17])
+
+```
+
+```{r}
+#shinystan(fit)
+saveRDS(fit8, "fit8.rds")
+```
+
+```{r}
+modelString9 <- "
+data { 
+    int<lower=1> Ntotal; 
+    int<lower=1> Nx; 
+    vector[Ntotal] y; 
+    matrix[Ntotal, Nx] x; 
+}
+transformed data { 
+    real meanY;
+    real sdY;
+    vector[Ntotal] zy; 
+    vector[Nx] meanX;
+    vector[Nx] sdX;
+    matrix[Ntotal, Nx] zx; 
+    meanY = mean(y);
+    sdY = sd(y);
+    zy = (y - meanY) / sdY;
+    for ( j in 1:Nx ) {
+        meanX[j] = mean(x[,j]);
+        sdX[j] = sd(x[,j]);
+        for ( i in 1:Ntotal ) {
+            zx[i,j] = ( x[i,j] - meanX[j] ) / sdX[j];
+        }
+    }
+}
+parameters {
+    real zbeta0;
+    vector[Nx] zbeta;
+    real<lower=0> sigmaBeta0;
+    vector<lower=0>[Nx] sigmaBeta;
+    real<lower=0> zsigma;
+    real<lower=0> tau;
+    real<lower=0> nu;
+    real<lower=0> sigmaBetaKappa;
+    real<lower=0> sigmaBetaTheta;
+}
+model {
+    sigmaBeta0 ~ gamma(3.0, 2.0); // mode=(kappa-1)/theta, var=kappa/theta^2
+    zbeta0 ~ student_t(1.0/30.0,0,sigmaBeta0); 
+    sigmaBetaKappa ~ uniform(1.0e-1, 1.0e1);
+    sigmaBetaTheta ~ uniform(1.0e-1, 1.0e1);
+    sigmaBeta ~ gamma(sigmaBetaKappa, sigmaBetaTheta); // mode=(kappa-1)/theta, var=kappa/theta^2
+    zbeta ~ student_t(1.0/30.0,0,sigmaBeta);
+    zsigma ~ gamma(3.0, 2.0);
+    nu ~ gamma(3.0, 2.0);
+    tau ~ gamma(nu/2.0,nu/2.0);
+    zy ~ normal(zbeta0 + zx * zbeta, 1/sqrt(tau)); 
+}
+generated quantities { 
+    real beta0; 
+    vector[Nx] beta;
+    beta = sdY * ( zbeta ./ sdX );
+    beta0 = zbeta0 * sdY  + meanY - sdY * sum( zbeta .* meanX ./ sdX );
+} "
+```
+
+
+```{r}
+RobustMultipleRegressionDso9 <- stan_model( model_code=modelString9 )
+```
+
+```{r}
+fit9  <- sampling(RobustMultipleRegressionDso9,
+               data=dataListRegression,
+               pars=c('beta0', 'beta','zbeta0','zbeta','sigmaBeta0','sigmaBeta','zsigma', 'nu', 'tau','sigmaBetaKappa','sigmaBetaTheta'),
+               iter=10000, chains = 4, cores = 4,
+               control = list(adapt_delta = .90, max_treedepth = 20))
+
+```
+
+```{r}
+posterior <- as.array(fit9)
+lp <- log_posterior(fit9)
+np <- nuts_params(fit9)
+rhats <- rhat(fit9)
+ratios <- neff_ratio(fit9)
+params <- colnames(as.matrix(fit9))
+feature_names <- colnames(x)
+plot(fit9,pars=c("beta"))
+hdi(as.matrix(fit9)[,3])
+hdi(as.matrix(fit9)[,5])
+
+```
+
+
+```{r}
+color_scheme_set("darkgray")
+mcmc_parcoord(posterior, np = np, pars = params[2:5])
+mcmc_parcoord(posterior, np = np, pars = params[6:10])
+mcmc_parcoord(posterior, np = np, pars = params[11:14])
+
+
+```
+
+```{r}
+mcmc_pairs(posterior, np = np, 
+           off_diag_args = list(size = 0.75), pars = params[1:5])
+mcmc_pairs(posterior, np = np, 
+           off_diag_args = list(size = 0.75), pars = params[11:14])
+mcmc_pairs(posterior, np = np, 
+           off_diag_args = list(size = 0.75), pars = params[15:21])
+
+```
+
+
+```{r}
+scatter <- mcmc_scatter(posterior, 
+  pars = params[c(2,4)],
+  np = np, 
+  size = 1)
+scatter
+```
+
+```{r}
+color_scheme_set("mix-brightblue-gray")
+mcmc_trace(posterior, np = np) + 
+  xlab("Post-warmup iteration")
+```
+
+```{r}
+color_scheme_set("red")
+mcmc_nuts_energy(np)
+```
+
+```{r}
+color_scheme_set("brightblue") # see help("color_scheme_set")
+mcmc_rhat(rhats)
+```
+
+```{r}
+stan_ac(fit8)
+stan_ac(fit8, pars = params[11:14])
+stan_ac(fit8, pars = params[15:17])
+```
+
+```{r}
+mcmc_neff(ratios, size = 2)
+```
+
+
+```{r}
+stan_dens(fit9)
+stan_dens((fit9), pars = params[9:14])
+stan_dens((fit9), pars = params[15:17])
+stan_dens((fit9), pars = params[18:21])
+
+```
+
+```{r}
+#shinystan(fit)
+saveRDS(fit8, "fit8.rds")
+```
+
+

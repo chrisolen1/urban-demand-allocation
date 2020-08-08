@@ -45,9 +45,8 @@ demand = graph_to_demand_model(graph, demand, "zestimate", neighborhoods, "neigh
 demand = graph_to_demand_model(graph, demand, "primary_type", neighborhoods, "neighborhood")
 demand = graph_to_demand_model(graph, demand, "zestimate", neighborhoods, "neighborhood", edge_relation="NEXT_TO")
 demand = graph_to_demand_model(graph, demand, "primary_type", neighborhoods, "neighborhood", edge_relation="NEXT_TO")
-# drop lat, long
-demand.drop(['latitude','longitude'], axis=1, inplace=True)
+
 # remove any null values
 demand.dropna(inplace=True)
 
-demand.to_csv("test.csv", index=False)
+demand.to_csv("demand_model.csv", index=False)

@@ -1,21 +1,9 @@
----
-title: "bayesian_regression"
-output: html_document
----
 
-```{r}
-library(HDInterval)
 library(rstan)
-library(bayesplot)
-```
 
-```{r}
 dataPath <- "/Users/chrisolen/Documents/uchicago_courses/optimization/project/urban-demand-allocation/demand_models"
-dat<-read.csv(paste(dataPath,"test.csv",sep="/"))
-head(dat)
-```
+dat <- read.csv(paste(dataPath,"test.csv",sep="/"))
 
-```{r}
 x <- as.matrix(dat[,c(-1,-2,-3)])
 y <- dat[,1]
 Ntotal <- dim(x)[1]
@@ -24,9 +12,7 @@ dataListRegression <- list(Ntotal=Ntotal,
                            y=y,
                            x=x,
                            Nx=Nx)
-```
 
-```{r}
 modelString <- "
 data { 
     int<lower=1> Ntotal; 
@@ -77,89 +63,21 @@ generated quantities {
     beta = sdY * ( zbeta ./ sdX );
     beta0 = zbeta0 * sdY  + meanY - sdY * sum( zbeta .* meanX ./ sdX );
 } "
-```
 
-
-```{r}
 RobustMultipleRegressionDso <- stan_model( model_code=modelString )
-```
 
-```{r}
 fit  <- sampling(RobustMultipleRegressionDso,
-               data=dataListRegression,
-               pars=c('beta0', 'beta','zbeta0','zbeta','sigmaBeta0','sigmaBeta','zsigma', 'nu', 'tau'),
-               iter=25000, chains = 8, cores = 4,
-               control = list(adapt_delta = .80, max_treedepth = 20))
+                 data=dataListRegression,
+                 pars=c('beta0', 'beta','zbeta0','zbeta','sigmaBeta0','sigmaBeta','zsigma', 'nu', 'tau'),
+                 iter=25000, chains = 8, cores = 4,
+                 control = list(adapt_delta = .80, max_treedepth = 20))
 
-```
-
-```{r}
 demand_features <- colnames(dat[,4:7])
 demand_coefs <- c(median(as.matrix(fit)[,2]),
-median(as.matrix(fit)[,3]),
-median(as.matrix(fit)[,4]),
-median(as.matrix(fit)[,5]))
+                  median(as.matrix(fit)[,3]),
+                  median(as.matrix(fit)[,4]),
+                  median(as.matrix(fit)[,5]))
 results <- cbind(demand_features, demand_coefs)
 write.csv(results, "test.csv", row.names = FALSE)
-```
-mean(as.matrix(fit)[,1])
-
-
-
-```{r}
-posterior <- as.array(fit)
-lp <- log_posterior(fit)
-np <- nuts_params(fit)
-rhats <- rhat(fit)
-ratios <- neff_ratio(fit)
-params <- colnames(as.matrix(fit))
-feature_names <- colnames(x)
-plot(fit,pars=c("beta"))
-hdi(as.matrix(fit)[,3])
-hdi(as.matrix(fit)[,5])
-
-```
-
-
-
-
-
-```{r}
-stan_dens(fit)
-stan_ac(fit)
-mcmc_neff(ratios, size = 2)
-color_scheme_set("mix-brightblue-gray") # see help("color_scheme_set")
-mcmc_trace(posterior, np = np) + 
-  xlab("Post-warmup iteration")
-color_scheme_set("brightblue") 
-mcmc_rhat(rhats)
-color_scheme_set("red")
-mcmc_nuts_energy(np)
-```
-
-
-```{r}
-### optional model diagnostics ###
-color_scheme_set("darkgray")
-mcmc_pairs(posterior, np = np, 
-           off_diag_args = list(size = 0.75))
-mcmc_parcoord(posterior, np = np)
-mcmc_scatter(posterior, 
-  pars = params[c(2,4)],
-  np = np, 
-  size = 1)
-
-```
-
-```{r}
-#shinystan(fit)
-saveRDS(fit, "fit.rds")
-```
-
-
-
-
-
-
 
 
