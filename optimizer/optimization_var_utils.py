@@ -1,12 +1,15 @@
 import sys
 sys.path.append('/Users/chrisolen/Documents/uchicago_courses/optimization/project/urban-demand-allocation')
+import pandas as pd
+import numpy as np
 import random
 from scipy import spatial
-import utilities
+from tqdm import tqdm
 from py2neo import Graph
-random.seed(10)
+import utilities
 
-def sample_addresses(addresses, localities, locality_type, sample_size=10000):
+
+def sample_addresses(addresses, localities, locality_type, sample_size=10000, seed=10):
 
 	"""
 	take a random sample from the address book and add locality metadata based on lat-long coordinates
@@ -21,7 +24,7 @@ def sample_addresses(addresses, localities, locality_type, sample_size=10000):
 	addresses = addresses[addresses["PLACENAME"]=="Chicago"][["ADDRDELIV","LATITUDE","LONGITUDE"]]
 	addresses = addresses.reset_index()
 	addresses.drop(["index"], inplace=True, axis=1)
-	
+	random.seed(seed)
 	# take a random sample of coordinates to reduce the number of variables of the optimization problem
 	rand_index = random.sample(range(0, 582676), sample_size)
 	# these will become our optimization variables
@@ -30,8 +33,9 @@ def sample_addresses(addresses, localities, locality_type, sample_size=10000):
 	zipped_coords = list(zip(address_sample["LONGITUDE"],address_sample["LATITUDE"]))
 	
 	coord_locality = []
-		
-	for j in range(len(zipped_coords)):
+	
+	print("assigning locality names to sampled address coordinates")
+	for j in tqdm(range(len(zipped_coords))):
 		result = utilities.point_lookup(localities, zipped_coords[j])
 		coord_locality.append(result)
 		
@@ -87,7 +91,12 @@ def graph_to_address_frame(graph, address_frame, feature, localities, locality_t
 	# (determined by the localities shapefiles)
 	outside_search_area = []
 	# iterate through lat_long pairs for each address
-	for i in range(len(address_coordinates)):
+	if edge_relation:
+		print("iterating through address_coordinates to build {} feature".format(modified_feature))
+	else:
+		print("iterating through address_coordinates to build {} feature".format(feature))
+	
+	for i in tqdm(range(len(address_coordinates))):
 
 		# get location label based on localities shape file
 		point_location = utilities.point_lookup(localities,address_coordinates[i])
@@ -126,7 +135,8 @@ def graph_to_address_frame(graph, address_frame, feature, localities, locality_t
 			outside_search_area.append((i, address_coordinates[i]))
 	 
 	# for the coordinates that lie (usually barely) outside the search area 
-	for i in range(len(outside_search_area)): 
+	print("assigning values for coordinates just outside the area of interest")
+	for i in tqdm(range(len(outside_search_area))): 
 	
 		point_location = utilities.closest_to(localities,outside_search_area[i][1])
 	
