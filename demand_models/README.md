@@ -6,4 +6,4 @@
 
 2. For OLS regression demand model, run ```python3 ols.py```
 
-3. For Bayesian-regularized demand model, run ```python3 bayesian_regression.R``` 
+3. For Bayesian-regularized demand model, run ```Rscript bayesian_regression.R``` 
