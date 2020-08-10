@@ -7,8 +7,6 @@ import json
 
 from py2neo import Graph
 
-from sklearn.linear_model import LinearRegression
-
 import utilities
 from demand_models.build_demand_model_utils import business_filter, connect_to_neo4j, graph_to_demand_model
 
@@ -25,7 +23,7 @@ with open('../../data/geo_shape_files/tract_reformatted.json','r') as f:
     tracts = json.load(f)
 
 # specify years and naics codes of interest     
-years = [2016,2017,2015]
+years = [2017] # at the moment, we should just keep it to one year since socioecon data is just one year 
 years.sort(reverse=True)
 naics = ['445110','335']   
 
@@ -49,4 +47,5 @@ demand = graph_to_demand_model(graph, demand, "primary_type", neighborhoods, "ne
 # remove any null values
 demand.dropna(inplace=True)
 
-demand.to_csv("demand_model.csv", index=False)
+demand.to_csv("../../data/demand_model.csv", index=False)
+

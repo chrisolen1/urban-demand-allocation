@@ -14,9 +14,9 @@ python3 reformat_geospatial_jsons.py --geo_data_directory "../../data/geo_shape_
 python3 standardize_place_names.py --geo_data_directory "../../data/geo_shape_files" --data_directory "../../data"
 ```
 
-3. Run ```create_graph.py``` to aggregate socioeconomic data by neighborhood and census tract and output the queries required to create the urban graph model.
+3. Run ```python3 create_graph_model.py``` to aggregate socioeconomic data by neighborhood and census tract and output the queries required to create the urban graph model.
 
-4. Run ```txt_to_neo4j.py``` to execute neo4j queries in neo4j server.
+4. Run ```python3 txt_to_neo4j.py``` to execute neo4j queries in neo4j server.
   
 ## Running Neo4j locally
 

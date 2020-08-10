@@ -2,10 +2,11 @@
 library(rstan)
 
 dataPath <- "/Users/chrisolen/Documents/uchicago_courses/optimization/project/urban-demand-allocation/demand_models"
-dat <- read.csv(paste(dataPath,"test.csv",sep="/"))
+dat <- read.csv("../../data/demand_model.csv")
+dat <- subset(dat, select = -c(year, latitude, longitude))
 
-x <- as.matrix(dat[,c(-1,-2,-3)])
-y <- dat[,1]
+x <- subset(dat, select = -c(sales_volume_location))
+y <- dat$sales_volume_location
 Ntotal <- dim(x)[1]
 Nx <- dim(x)[2]
 dataListRegression <- list(Ntotal=Ntotal,
@@ -70,14 +71,13 @@ fit  <- sampling(RobustMultipleRegressionDso,
                  data=dataListRegression,
                  pars=c('beta0', 'beta','zbeta0','zbeta','sigmaBeta0','sigmaBeta','zsigma', 'nu', 'tau'),
                  iter=25000, chains = 8, cores = 4,
-                 control = list(adapt_delta = .80, max_treedepth = 20))
+                 control = list(adapt_delta = .90, max_treedepth = 20))
 
-demand_features <- colnames(dat[,4:7])
+demand_features <- colnames(subset(dat, select = -c(sales_volume_location)))
 demand_coefs <- c(median(as.matrix(fit)[,2]),
                   median(as.matrix(fit)[,3]),
                   median(as.matrix(fit)[,4]),
                   median(as.matrix(fit)[,5]))
-results <- cbind(demand_features, demand_coefs)
-write.csv(results, "test.csv", row.names = FALSE)
+write.table(demand_coefs, "../../data/betas.csv", row.names = FALSE, col.names = FALSE)
 
 

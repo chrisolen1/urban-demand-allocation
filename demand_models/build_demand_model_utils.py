@@ -13,8 +13,8 @@ def business_filter(bus_frame, years, naics_codes):
 	:years: list of integer years you would like to select out
 	:naics_codes: list of string naics codes you would like to select out,
 				will match only up to the length of the code provided
-	Returns: business dataframe index by the latest year's abi with current and past year
-				sales figures/employee info as features (versus as additional instances)
+	Returns: filtered business dataframe, potentially including sales volume for 
+	the same store for multiple years 
 	"""
 
 	assert(isinstance(years,list)), "\
@@ -31,32 +31,11 @@ def business_filter(bus_frame, years, naics_codes):
 
 	# filter for indicated years and naics_codes
 	bus = naics_year_filter(bus_frame, years, naics_codes)
-	# set meta data aside
-	meta_data = bus[bus['year']==2017][['abi','year_established','latitude','longitude']]
 	# drop meta data and other info used for filtering
-	bus.drop(['primary_naics_code','company','business_status_code','company_holding_status',
-		'year_established','latitude','longitude'], axis=1, inplace=True)
-	# pull out the latest year 
-	latest_year = max(years)
+	bus.drop(['abi','primary_naics_code','company','business_status_code','company_holding_status',
+		'year_established','employee_size_location'], axis=1, inplace=True)
 
-	# left join successive years of business data using latest year abi as left key
-	for i in years:
-		if i == latest_year:
-			demand = bus[bus['year']==i]
-
-		else:
-			frame = bus[bus['year']==i]
-			demand = pd.merge(how='left', left=demand, right=frame, left_on='abi', right_on='abi', suffixes = ("","_{}".format(str(i))))
-
-	# merge meta data back in
-	demand = pd.merge(how='left', left=demand, right=meta_data, left_on='abi', right_on='abi')  
-
-	# dropping filter categories and indices not required for demand model
-	demand.drop(['abi', 'year_established'], axis=1, inplace=True)
-	demand.drop([i for i in demand.columns if 'year' in i], axis=1, inplace=True)
-	demand.drop([i for i in demand.columns if 'employee' in i], axis=1, inplace=True)
-
-	return demand      
+	return bus
 		
 
 def naics_year_filter(bus_frame, years, naics_codes):

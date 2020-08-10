@@ -1,2 +1,0 @@
-['neighborhood_avg_property_value', 'neighborhood_property_crimes', 'surrounding_neighborhood_avg_property_value', 'surrounding_neighborhood_property_crimes']
-[-0.2547677851422151, -0.5263550451979571, 1.1614176431445236, -2.0225396857646305]

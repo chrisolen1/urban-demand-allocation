@@ -13,7 +13,7 @@ parse_results = parser.parse_args()
 geo_data_directory = parse_results.geo_data_directory
 
 # clean neighborhoods json file:
-
+print("cleaning up neighborhoods shapefiles")
 with open('{}/neighborhoods.json'.format(geo_data_directory),'r') as f:
     neighborhoods_dict = json.load(f)
 
@@ -37,7 +37,7 @@ with open ("{}/neighborhood_reformatted.json".format(geo_data_directory),'w') as
     json.dump(neighborhoods, f)
 
 # clean zoning json file:
-
+print("cleaning up zoning shapefiles")
 with open('{}/zoning.json'.format(geo_data_directory),'r') as f:
     zoning_dict = json.load(f)
 
@@ -63,7 +63,7 @@ with open ("{}/zoning_reformatted.json".format(geo_data_directory),'w') as f:
     json.dump(zoning, f)
 
 # cleaning census track json file:
-
+print("cleaning up census tract shapefiles")
 with open('{}/tracts.json'.format(geo_data_directory),'r') as f:
     tract_dict = json.load(f)
 

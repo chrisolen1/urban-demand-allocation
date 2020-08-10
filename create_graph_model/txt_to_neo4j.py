@@ -5,7 +5,7 @@ pynx_to_neo4j.py
 
 from py2neo import Graph
 
-with open('../neo.txt', 'r') as file:
+with open('graph_models/neo.txt', 'r') as file:
     neo = file.read().replace('\n', ' \n')
 
 # establish connection to neo4j

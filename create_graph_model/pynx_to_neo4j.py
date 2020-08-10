@@ -4,6 +4,7 @@ import json
 import re
 import networkx as nx
 from itertools import combinations, permutations, product
+from tqdm import tqdm
 
 def create_pynx_nodes(frame, node_category=None, attribute_columns=None, existing_graph=None):
 
@@ -34,13 +35,16 @@ def create_pynx_nodes(frame, node_category=None, attribute_columns=None, existin
 	nodes = list(frame.index)
 
 	# create nodes with default
-	for i in nodes:
+	print("creating nodes")
+	for i in tqdm(nodes):
 		G.add_node(i, name=i, node_category=node_category)
 
-	# create attributes
-	for attribute in attribute_columns:
-		for node in nodes:
-			G.nodes()[node].update({attribute:frame.loc[node, attribute]})
+	# create attributes if attribute_columns given
+	if attribute_columns:
+		print("creating attributes")
+		for attribute in tqdm(attribute_columns):
+			for node in nodes:
+				G.nodes()[node].update({attribute:frame.loc[node, attribute]})
 
 	return G
 
@@ -100,7 +104,8 @@ def add_edges_to_pynx(graph, edge_relationship, criteria_func, criteria_func_nod
 	#kwarg1 and kwarg2 is how the criteria function references the two nodes whose edge relationship it will determine
 	kwarg1, kwarg2 = criteria_func_node_pair_reference_kwargs[0], criteria_func_node_pair_reference_kwargs[1]
 	
-	for i in node_combs:
+	print("iterating through all possible edge relationships")
+	for i in tqdm(node_combs):
 
 		### criteria function must return True or a value in order for the edge relationship to be established ###
 		if criteria_func(**{kwarg1:i[0]},
@@ -141,7 +146,8 @@ def pynx_to_neo4j_queries(graph, return_nodes=True, return_edges=True):
 	nx_nodes = list(graph.nodes.data())
 	neo_nodes = []
 
-	for i in nx_nodes:
+	print("creating node queries")
+	for i in tqdm(nx_nodes):
 
 		n_attributes = len(list(i[1].values())) 
 
@@ -161,7 +167,8 @@ def pynx_to_neo4j_queries(graph, return_nodes=True, return_edges=True):
 		neo_nodes.append(concatenated)
 
 	nx_edges = list(graph.edges.data())
-	neo_edges = ["CREATE " + "(" + re.sub(r'\W+','',i[0]) + ")" + "-[:" + list(i[2].keys())[0] + " " + str(list(i[2].values())[0]) + "]" + "->" + "(" + re.sub(r'\W+','',i[1]) + ")" for i in nx_edges]
+	print("creating edge queries")
+	neo_edges = ["CREATE " + "(" + re.sub(r'\W+','',i[0]) + ")" + "-[:" + list(i[2].keys())[0] + " " + str(list(i[2].values())[0]) + "]" + "->" + "(" + re.sub(r'\W+','',i[1]) + ")" for i in tqdm(nx_edges)]
 	
 	if return_nodes and return_edges:
 		neo = neo_nodes + neo_edges
