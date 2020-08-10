@@ -60,6 +60,6 @@ G = pynx_to_neo4j.add_edges_to_pynx(G, "IS_WITHIN", utilities.intersection, ["po
 neo = pynx_to_neo4j.pynx_to_neo4j_queries(G, return_nodes=True, return_edges=True)
 
 # save as txt file
-with open('../../data/neo_queries.txt', 'w') as neo_text:
+with open('../../data/graph_models/neo_queries.txt', 'w') as neo_text:
     for listitem in neo:
         neo_text.write('%s\n' % listitem)
