@@ -6,6 +6,8 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import *
 
 import pandas as pd
+import io
+from google.cloud import storage
 
 def init_session(n_cores):
 
@@ -28,14 +30,13 @@ def stop_session(spark_context):
 
 	spark_context.stop()
 
-def bus_year_city_filter(spark_session, year, city, state, overwrite=False):
+def bus_year_city_filter(spark_session, year, city):
 
 	"""
 	Filter raw object storage file for city and year; write back to storage bucket
 	:spark_session: live spark session object
 	:year: int, year you want to select for 
 	:city: str, city you want to select for
-	:state: str, state of the city you want to select for 
 	:overwrite: bool, if True, will overwrite any existing file of the same year and city specifications
 	Returns: writes filtered spark dataframe back to storage bucket 
 	"""
@@ -45,27 +46,26 @@ def bus_year_city_filter(spark_session, year, city, state, overwrite=False):
 
 	assert(isinstance(city,str)),"\
 	city must be of type str"
-
-	assert(isinstance(state,str)),"\
-	state must be of type str"
-
+    
+	# connect to cloud storage
+	client = storage.Client()
+	bucket = client.get_bucket('biz-bucket')
+    
 	# read to spark df
 	bus = spark_session.read.csv("gs://biz-bucket/raw_business.csv", inferSchema=True, header=True, sep = ',')
 	# drop currently un-needed columns
-	drop_list = ['ticker', 'address_line_1', 'zipcode','location_employee_size_code',
+	drop_list = ['ticker', 'address_line_1','location_employee_size_code',
 	'location_sales_volume_code','sic_code','sic6_descriptions_sic','office_size_code',
 	'parent_employee_size_code','parent_sales_volume_code','census_tract','cbsa_code',
 	'parent_actual_employee_size','parent_actual_sales_volume']
 	bus = bus.select([column for column in bus.columns if column not in drop_list])
 	# apply filtering
-	bus = bus.filter(bus['city']==city).filter(bus['state']==state).filter(bus['archive_version_year']==year)
-	
-	if overwrite == True:
-		bus.write.csv('gs://biz-bucket/bus_{}_{}.csv'.format(city, year), mode="overwrite")
-	else:
-		bus.write.csv('gs://biz-bucket/bus_{}_{}.csv'.format(city, year), mode="error")
+	bus = bus.filter(bus['city']==city).filter(bus['archive_version_year']==year)
+	# transfer to pandas
+	bus = bus.toPandas()
+	# upload to cloud storage    
+	bucket.blob('gs://biz-bucket/bus_{}_{}.csv'.format(city, year)).upload_from_string(bus.to_csv(), 'text/csv')
 
-	return bus
 
 def res_year_city_filter(spark_session, year, city, state, overwrite=False):
 
