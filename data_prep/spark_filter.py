@@ -64,10 +64,10 @@ def bus_year_city_filter(spark_session, year, city):
 	# transfer to pandas
 	bus = bus.toPandas()
 	# upload to cloud storage    
-	bucket.blob('gs://biz-bucket/bus_{}_{}.csv'.format(city, year)).upload_from_string(bus.to_csv(), 'text/csv')
+	bucket.blob('bus_{}_{}.csv'.format(city, year)).upload_from_string(bus.to_csv(index=False), 'text/csv')
 
 
-def res_year_city_filter(spark_session, year, city, state, overwrite=False):
+def res_year_city_filter(spark_session, year, city, state):
 
 	"""
 	Filter raw object storage file for city and year; write back to storage bucket
@@ -88,8 +88,12 @@ def res_year_city_filter(spark_session, year, city, state, overwrite=False):
 	assert(isinstance(state,str)),"\
 	state must be of type str"
 
+    # connect to cloud storage
+	client = storage.Client()
+	bucket = client.get_bucket('res-bucket')
+    
 	# read to spark df 
-	res = spark.read.csv("gs://res-bucket/raw_res_{}.txt".format(year), inferSchema=True, header=False, sep = '\t')
+	res = spark_session.read.csv("gs://res-bucket/raw_res_{}.txt".format(year), inferSchema=True, header=False, sep = '\t')
 	# columns must be renamed
 	res = res.withColumnRenamed('_c0','household_id').withColumnRenamed('_c1','location_type')\
 	.withColumnRenamed('_c2','length_of_residence').withColumnRenamed('_c3','children_count')\
@@ -110,11 +114,10 @@ def res_year_city_filter(spark_session, year, city, state, overwrite=False):
 	res = res.select([column for column in res.columns if column not in drop_list])
 	# apply filtering
 	res = res.filter(res['city']==city).filter(res['state']==state)
-
-	if overwrite == True:
-		res.write.csv('gs://res-bucket/res_{}_{}.csv'.format(city, year), mode="overwrite")
-	else:
-		res.write.csv('gs://res-bucket/res_{}_{}.csv'.format(city, year), mode="error")
+	# transfer to pandas
+	res = res.toPandas()
+	# upload to cloud storage    
+	bucket.blob('res_{}_{}.csv'.format(city, year)).upload_from_string(res.to_csv(index=False), 'text/csv')
 
 
 
