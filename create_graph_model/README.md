@@ -1,22 +1,10 @@
-# urban-demand-allocation: data preparation
+# urban-demand-allocation: graph model
 
-## Steps to setting up urban graph model
+## Steps to set up graph model
 
-1. Run ```reformat_geospatial_jsons.py``` to reformat the zoning.json, neighborhood.json, and tract.json geospatial shape files:
+1. Run ```python3 create_graph_model.py``` to aggregate socioeconomic data by neighborhood and census tract and output the queries required to create the urban graph model.
 
-```
-python3 reformat_geospatial_jsons.py --geo_data_directory "../../data/geo_shape_files" 
-```
-
-2. Run ```standardize_place_names.py``` to standardize place names encoded in socioeconomic data. 
-
-```
-python3 standardize_place_names.py --geo_data_directory "../../data/geo_shape_files" --data_directory "../../data"
-```
-
-3. Run ```python3 create_graph_model.py``` to aggregate socioeconomic data by neighborhood and census tract and output the queries required to create the urban graph model.
-
-4. Run ```python3 txt_to_neo4j.py``` to execute neo4j queries in neo4j server.
+2. Run ```python3 txt_to_neo4j.py``` to execute neo4j queries in neo4j server.
   
 ## Running Neo4j locally
 

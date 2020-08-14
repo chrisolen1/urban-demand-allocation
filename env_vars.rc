@@ -1,0 +1,12 @@
+export HOME_DIR="/urban-demand-allocation"
+
+export GEO_DIR="gs://geog-bucket"
+
+export RES_DIR="gs://res-bucket"
+
+export CRIME_DIR="gs://crim-bucket"
+
+export BUS_DIR="gs://biz-bucket"
+
+
+
