@@ -10,9 +10,9 @@ parser.add_argument('--gcp', action='store_true', dest='gcp', help='affects whet
 parse_results = parser.parse_args()
 home_directory = parse_results.home_directory
 geo_directory = parse_results.geo_directory
-res_directory = parse_results.data_directory
 file_name = parse_results.file_name
 geo_type = parse_results.geo_type
+data_directory = parse_results.data_directory
 gcp = parse_results.gcp
 
 import sys
@@ -36,7 +36,7 @@ are the same across all data sources
 
 # use polygon json files as naming standard
 if gcp:
-	bucket = storage_client.get_bucket(geo_director)
+	bucket = storage_client.get_bucket(geo_directory[5:])
 	blob = bucket.blob('{}_reformatted.json'.format(geo_type))
 	geo = json.loads(blob.download_as_string(client=None))
 
@@ -44,13 +44,11 @@ else:
 	with open('{}/{}_reformatted.json'.format(geo_directory, geo_type),'r') as f:
     	geo = json.load(f)
     
-# standardize place names in residential data
 
 df = pd.read_csv('{}/{}'.format(data_directory, file_name))
 
-df = list(zip(df.longitude, df.latitude))
+positions = list(zip(df.longitude, df.latitude))
 
-positions = list(zip(properties.longitude, properties.latitude))
 print("matching samples with {}".format(geo_type))
 n = [utilities.point_lookup(geo, positions[i]) for i in tqdm(range(len(df)))]
 
@@ -102,5 +100,5 @@ crime['tracts'] = np.array(t)
 
 print("writing crime_standardized.csv")
 crime.to_csv('{}/crime_standardized.csv'.format(data_directory))
-
+"""
 
