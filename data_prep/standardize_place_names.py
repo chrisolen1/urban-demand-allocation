@@ -21,7 +21,8 @@ sys.path.append(home_directory)
 import pandas as pd
 import numpy as np
 import json
-from tqdm import tqdm
+from p_tqdm import p_map
+import functools
 if gcp:
 	import gcsfs
 	from google.cloud import storage
@@ -50,7 +51,8 @@ df = pd.read_csv('{}/{}'.format(data_directory, file_name))
 positions = list(zip(df.longitude, df.latitude))
 
 print("matching samples with {}".format(geo_type))
-n = [utilities.point_lookup(geo, positions[i]) for i in tqdm(range(len(df)))]
+lookup = functools.partial(utilities.point_lookup, geo)
+n = p_map(lookup, positions)
 
 df['{}'.format(geo_type)] = np.nan
 
