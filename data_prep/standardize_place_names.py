@@ -30,7 +30,39 @@ if gcp:
     from google.cloud import storage
     storage_client = storage.Client()
 
-import utilities
+#import utilities
+def point_lookup(polygon_dict, point):
+
+	"""
+	assign place label corresponding to the provided
+	(long, lat) or (lat, long) coordinate based on which 
+	polygon from polygon_dict it fits in
+	Note: the order of the coordinate tuple (lat,long) or (long,lat)
+	depends the orderings present in the polygon_dict
+	:polygon_dict: dict of locality coordinate lists, where each coordinate represents a 
+					vertex of the locality shape.
+	:point: tuple of coordinates corresponding to the point of interest
+	Returns: Name of the locality to which the provided point corresponds, 
+			name will be one of the polygon_dict keys, else returns "None"
+	"""
+	assert(isinstance(polygon_dict, dict)), "\
+			polygon_dict argument must be of type dict"
+
+	assert(isinstance(point, tuple)), "\
+			point argument must be of type tuple"
+	# convert to point object
+	point = Point(point) 
+	
+	# iterate over locality keys
+	for i in range(len(list(polygon_dict.keys()))):
+		result = Polygon(polygon_dict[list(polygon_dict.keys())[i]][0]).contains(point) # zero index is there because of zoning type in zoning data
+		
+		# return the relevant key if we have a result
+		if result == True:
+			return list(polygon_dict.keys())[i]
+			break
+
+	return "None" 
 
 """
 ensures that neighborhood and census tract naming conventions
@@ -58,13 +90,13 @@ print("matching samples with {}".format(geo_type))
 #if __name__ == '__main__':
 #    n = imap_unordered_bar(lookup, positions)
 
-#lookup = partial(utilities.point_lookup, geo)
-#if __name__ == '__main__':
-#    with mp.Pool(4) as p:
-#       list(tqdm.tqdm(p.imap(lookup, positions), total=len(positions)))
+lookup = partial(utilities.point_lookup, geo)
+if __name__ == '__main__':
+    with mp.Pool(4) as p:
+       list(tqdm.tqdm(p.imap(lookup, positions), total=len(positions)))
 
 
-[utilities.point_lookup(geo, positions[i]) for i in tqdm.tqdm(range(len(positions)))]
+#[utilities.point_lookup(geo, positions[i]) for i in tqdm.tqdm(range(len(positions)))]
 
 df['{}'.format(geo_type)] = np.nan
 
