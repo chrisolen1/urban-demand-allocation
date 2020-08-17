@@ -22,11 +22,13 @@ import pandas as pd
 import numpy as np
 import json
 from p_tqdm import p_map
-import functools
+import multiprocessing as mp
+import tqdm 
+from functools import partial
 if gcp:
-	import gcsfs
-	from google.cloud import storage
-	storage_client = storage.Client()
+    import gcsfs
+    from google.cloud import storage
+    storage_client = storage.Client()
 
 import utilities
 
@@ -37,13 +39,13 @@ are the same across all data sources
 
 # use polygon json files as naming standard
 if gcp:
-	bucket = storage_client.get_bucket(geo_directory[5:])
-	blob = bucket.blob('{}_reformatted.json'.format(geo_type))
-	geo = json.loads(blob.download_as_string(client=None))
+    bucket = storage_client.get_bucket(geo_directory[5:])
+    blob = bucket.blob('chicago_{}_reformatted.json'.format(geo_type))
+    geo = json.loads(blob.download_as_string(client=None))
 
 else:	
-	with open('{}/{}_reformatted.json'.format(geo_directory, geo_type),'r') as f:
-    	geo = json.load(f)
+    with open('{}/chicago_{}_reformatted.json'.format(geo_directory, geo_type),'r') as f:
+        geo = json.load(f)
     
 
 df = pd.read_csv('{}/{}'.format(data_directory, file_name))
@@ -51,8 +53,18 @@ df = pd.read_csv('{}/{}'.format(data_directory, file_name))
 positions = list(zip(df.longitude, df.latitude))
 
 print("matching samples with {}".format(geo_type))
-lookup = functools.partial(utilities.point_lookup, geo)
-n = p_map(lookup, positions)
+#n = p_map(partial(utilities.point_lookup, geo), positions, num_cpus=4)
+#lookup = partial(utilities.point_lookup, geo)
+#if __name__ == '__main__':
+#    n = imap_unordered_bar(lookup, positions)
+
+#lookup = partial(utilities.point_lookup, geo)
+#if __name__ == '__main__':
+#    with mp.Pool(4) as p:
+#       list(tqdm.tqdm(p.imap(lookup, positions), total=len(positions)))
+
+
+[utilities.point_lookup(geo, positions[i]) for i in tqdm.tqdm(range(len(positions)))]
 
 df['{}'.format(geo_type)] = np.nan
 
