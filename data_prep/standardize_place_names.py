@@ -5,7 +5,7 @@ parser.add_argument("--geo_directory", action="store", dest="geo_directory", typ
 parser.add_argument("--data_directory", action="store", dest="data_directory", type=str, help="location of the relevant data directory")
 parser.add_argument("--file_name", action="store", dest="file_name", type=str, help="name of the file we're updating")
 parser.add_argument("--geo_type", action="store", dest="geo_type", type=str, help="type of the geo shapefile")
-parser.add_argument("--n_cores", action="store", dest="n_cores", type=str, help="number of cores to be used for processing")
+parser.add_argument("--n_cores", action="store", dest="n_cores", type=int, help="number of cores to be used for processing")
 parser.add_argument('--gcp', action='store_true', dest='gcp', help='affects whether to configure to running on the cloud')
 
 parse_results = parser.parse_args()
@@ -57,7 +57,7 @@ print("matching samples with {}".format(geo_type))
 
 if n_cores > 1:
 	lookup = partial(utilities.point_lookup, geo)
-	pool = mp.Pool(processes=4)
+	pool = mp.Pool(processes=n_cores)
 	chunksize = 1000
 	n = list(tqdm.tqdm(pool.imap(lookup, positions, chunksize), total=len(positions)))
 
