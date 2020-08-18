@@ -14,7 +14,7 @@ import spark_filter
 
 print("initializing spark session")
 ss,sc = spark_filter.init_session(n_workers)
-%time spark_filter.res_year_city_filter(ss, year, city, state)
+spark_filter.res_year_city_filter(ss, year, city, state)
 print("closing spark session")
 spark_filter.stop_session(sc)
 print("session closed")
