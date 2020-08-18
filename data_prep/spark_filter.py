@@ -46,12 +46,12 @@ def bus_year_city_filter(spark_session, year, city):
 
 	assert(isinstance(city,str)),"\
 	city must be of type str"
-    
+	
 	# connect to cloud storage
 	client = storage.Client()
 	bucket = client.get_bucket('biz-bucket')
-    
-    print("reading in spark df")
+	
+	print("reading in spark df")
 	# read to spark df
 	bus = spark_session.read.csv("gs://biz-bucket/raw_business.csv", inferSchema=True, header=True, sep = ',')
 	# drop currently un-needed columns
@@ -64,6 +64,13 @@ def bus_year_city_filter(spark_session, year, city):
 	bus = bus.filter(bus['city']==city).filter(bus['archive_version_year']==year)
 	# transfer to pandas
 	bus = bus.toPandas()
+	# recoding cat variables
+	bus['business_status_code'].replace(to_replace={1:'headquarters', 2:'branch', 3:'subsidiary', 9:'single_location'}, inplace=True)
+	bus['company_holding_status'].replace(to_replace={np.nan:"private",1.0:"public"}, inplace=True)
+	# remove naics code nulls and convert to string
+	bus = bus[~bus['primary_naics_code'].isna()]
+	naics_converted = bus['primary_naics_code'].apply(lambda x: str(int(x)))
+	bus.loc[:,'primary_naics_code'] = naics_converted
 	print("uploading filtered df to storage")
 	# upload to cloud storage    
 	bucket.blob('bus_{}_{}.csv'.format(city, year)).upload_from_string(bus.to_csv(index=False), 'text/csv')
@@ -90,11 +97,11 @@ def res_year_city_filter(spark_session, year, city, state):
 	assert(isinstance(state,str)),"\
 	state must be of type str"
 
-    # connect to cloud storage
+	# connect to cloud storage
 	client = storage.Client()
 	bucket = client.get_bucket('res-bucket')
-    
-    print("reading in spark df")
+	
+	print("reading in spark df")
 	# read to spark df 
 	res = spark_session.read.csv("gs://res-bucket/raw_res_{}.txt".format(year), inferSchema=True, header=False, sep = '\t')
 	# columns must be renamed
