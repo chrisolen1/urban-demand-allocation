@@ -51,6 +51,7 @@ def bus_year_city_filter(spark_session, year, city):
 	client = storage.Client()
 	bucket = client.get_bucket('biz-bucket')
     
+    print("reading in spark df")
 	# read to spark df
 	bus = spark_session.read.csv("gs://biz-bucket/raw_business.csv", inferSchema=True, header=True, sep = ',')
 	# drop currently un-needed columns
@@ -63,6 +64,7 @@ def bus_year_city_filter(spark_session, year, city):
 	bus = bus.filter(bus['city']==city).filter(bus['archive_version_year']==year)
 	# transfer to pandas
 	bus = bus.toPandas()
+	print("uploading filtered df to storage")
 	# upload to cloud storage    
 	bucket.blob('bus_{}_{}.csv'.format(city, year)).upload_from_string(bus.to_csv(index=False), 'text/csv')
 
@@ -92,6 +94,7 @@ def res_year_city_filter(spark_session, year, city, state):
 	client = storage.Client()
 	bucket = client.get_bucket('res-bucket')
     
+    print("reading in spark df")
 	# read to spark df 
 	res = spark_session.read.csv("gs://res-bucket/raw_res_{}.txt".format(year), inferSchema=True, header=False, sep = '\t')
 	# columns must be renamed
@@ -116,6 +119,7 @@ def res_year_city_filter(spark_session, year, city, state):
 	res = res.filter(res['city']==city).filter(res['state']==state)
 	# transfer to pandas
 	res = res.toPandas()
+	print("uploading filtered df to storage")
 	# upload to cloud storage    
 	bucket.blob('res_{}_{}.csv'.format(city, year)).upload_from_string(res.to_csv(index=False), 'text/csv')
 
