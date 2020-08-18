@@ -30,6 +30,10 @@ if gcp:
     from google.cloud import storage
     storage_client = storage.Client()
 
+import json
+from shapely.geometry import shape, Point, Polygon
+import re
+from operator import itemgetter
 #import utilities
 def point_lookup(polygon_dict, point):
 
@@ -64,6 +68,16 @@ def point_lookup(polygon_dict, point):
 
 	return "None" 
 
+def f_mp(positions):
+    chunks = [positions[i::4] for i in range(4)]
+    chunksize =len(chunks[0])
+    print("chunksize", chunksize)
+    pool = mp.Pool(processes=4)
+ 
+    result = list(tqdm.tqdm(pool.imap(lookup, positions, 1000), total=len(positions)))
+
+    return result
+
 """
 ensures that neighborhood and census tract naming conventions
 are the same across all data sources
@@ -90,11 +104,13 @@ print("matching samples with {}".format(geo_type))
 #if __name__ == '__main__':
 #    n = imap_unordered_bar(lookup, positions)
 
-lookup = partial(utilities.point_lookup, geo)
-if __name__ == '__main__':
-    with mp.Pool(4) as p:
-       list(tqdm.tqdm(p.imap(lookup, positions), total=len(positions)))
+global lookup
+lookup = partial(point_lookup, geo)
+#if __name__ == '__main__':
+#    with mp.Pool(4) as p:
+#       list(tqdm.tqdm(p.imap(lookup, positions), total=len(positions)))
 
+n = f_mp(positions)
 
 #[utilities.point_lookup(geo, positions[i]) for i in tqdm.tqdm(range(len(positions)))]
 
