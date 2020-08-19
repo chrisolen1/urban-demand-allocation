@@ -119,18 +119,6 @@ def add_edges_to_pynx(graph, edge_relationship, criteria_func, criteria_func_nod
 	return graph
 
 
-
-"""
-		# dealing attributes for which we have no values
-		attribute_not_in = list(set(list(G.nodes())) - set(list(frame[node_column])))
-		if len(property_val_not_in) > 0:
-			for i in range(len(attribute_not_in)):
-			G.nodes()[attribute_not_in[i]][node_column][attribute] = str(np.NaN)
-"""
-
-
-
-
 def pynx_to_neo4j_queries(graph, return_nodes=True, return_edges=True):
 
 	"""
