@@ -6,9 +6,9 @@ parser.add_argument("--data_directory", action="store", dest="data_directory", t
 parser.add_argument("--graph_directory", action="store", dest="graph_directory", type=str, help="location of the graph models")
 parser.add_argument("--graph_model_name", action="store", dest="graph_model_name", type=str, help="name of new graph model")
 parser.add_argument("--file_name", action="store", dest="file_name", type=str, help="name of the file we're updating")
-parser.add_argument("--aggregate_function", action="store", dest="aggregate_function", type=list, help="aggregating function")
-parser.add_argument("--aggregate_by", action="store", dest="aggregate_by", type=list, help="feature to aggregate on")
-parser.add_argument("--features", action="store", dest="features", nargs='+',type=int, help="list of features to aggregate")
+parser.add_argument("--aggregate_function", action="store", dest="aggregate_function", type=str, help="aggregating function")
+parser.add_argument("--aggregate_by", action="store", dest="aggregate_by", type=str, help="feature to aggregate on")
+parser.add_argument("--features", action="store", dest="features", nargs='+',type=str, help="list of features to aggregate")
 parser.add_argument('--gcp', action='store_true', dest='gcp', help='affects whether to configure to running on the cloud')
 
 parse_results = parser.parse_args()
@@ -32,6 +32,10 @@ import json
 import re
 import networkx as nx
 from itertools import combinations, product
+if gcp:
+    import gcsfs
+    from google.cloud import storage
+    storage_client = storage.Client()
 
 import utilities
 import pynx_to_neo4j
@@ -40,7 +44,10 @@ import aggregate_features
 
 # use polygon json files as naming standard
 if gcp:
-    geo_bucket = storage_client.get_bucket(geo_directory[5:])
+    print("geo_directory:", geo_directory[5:])
+    print("aggregate by:", aggregate_by)
+    geo_bucket =storage_client.get_bucket(geo_directory[5:])
+    print('chicago_{}_reformatted.json'.format(aggregate_by))
     blob = geo_bucket.blob('chicago_{}_reformatted.json'.format(aggregate_by))
     geo = json.loads(blob.download_as_string(client=None))
 
@@ -87,8 +94,8 @@ if gcp:
 
 else:
     with open('{}/{}.txt'.format(graph_directory, graph_model_name), 'w') as neo_text:
-    for listitem in neo:
-        neo_text.write('%s\n' % listitem)
+        for listitem in neo:
+            neo_text.write('%s\n' % listitem)
 
 
 

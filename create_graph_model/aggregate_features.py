@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import json
 
-def aggregate_features(features_dataframe, aggregate_function, geo_data_directory, aggregate_by, *features_to_aggregate):
+def aggregate_features(features_dataframe, aggregate_function, geo_shape_file, aggregate_by, *features_to_aggregate):
 	
 	"""
 	Takes a a pandas dataframe of socioeconomic data (e.g. crime, property values)
@@ -24,10 +24,11 @@ def aggregate_features(features_dataframe, aggregate_function, geo_data_director
 			aggregate_by must be either neighborhood or tract"
 
 
-	unique_geos = list(geo.keys())
-	# determine features to retain in dataframe
-	features = list(features_to_aggregate).append(aggregate_by)
-	features_dataframe = features_dataframe[features] 
+	unique_geos = list(geo_shape_file.keys())
+        # determine features to retain in dataframe
+        print(features_to_aggregate)
+        features = features_to_aggregate.append(aggregate_by)
+        features_dataframe = features_dataframe[features] 
 
 	# remove rows from the socioeconomic data for which 'neighborhood' or 'tract' == 'None'
 	# otherwise, you'll get a key error when trying to match up with the shapefiles later 
