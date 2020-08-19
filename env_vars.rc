@@ -8,5 +8,5 @@ export CRIME_DIR="gs://crim-bucket"
 
 export BUS_DIR="gs://biz-bucket"
 
-
+export GRAPH_DIR="gs://graph-models"
 
