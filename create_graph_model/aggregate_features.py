@@ -25,10 +25,10 @@ def aggregate_features(features_dataframe, aggregate_function, geo_shape_file, a
 
 
 	unique_geos = list(geo_shape_file.keys())
-        # determine features to retain in dataframe
-        print(features_to_aggregate)
-        features = features_to_aggregate.append(aggregate_by)
-        features_dataframe = features_dataframe[features] 
+		# determine features to retain in dataframe
+		print(features_to_aggregate)
+		features = features_to_aggregate.append(aggregate_by)
+		features_dataframe = features_dataframe[features] 
 
 	# remove rows from the socioeconomic data for which 'neighborhood' or 'tract' == 'None'
 	# otherwise, you'll get a key error when trying to match up with the shapefiles later 
