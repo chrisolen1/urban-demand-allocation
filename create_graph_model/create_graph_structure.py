@@ -63,7 +63,7 @@ exists = ""
 if gcp:
     graph_bucket = storage_client.get_bucket(graph_directory[5:])
     graph_list = list(graph_bucket.list_blobs())
-    result = [1 if graph_model_name in name else 0 for name in graph_list]
+    result = [1 if graph_model_name in str(name) else 0 for name in graph_list]
     if sum(result) == 1:
         exists = True
         ix = result.index(1)
@@ -98,8 +98,8 @@ if exists:
     if gcp:
         
         blob = graph_bucket.blob('{}.pkl'.format(graph_model_name))
-        G = nx.read_gpickle(blob.download_as_string(client=None))
-
+        blob.download_to_filename("{}/create_graph_model/temp/temp.pkl".format(home_directory), client=None)
+        G = nx.read_gpickle("{}/create_graph_model/temp/temp.pkl".format(home_directory))
     
     else:
         
