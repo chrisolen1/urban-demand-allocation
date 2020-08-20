@@ -2,3 +2,13 @@
     for listitem in neo:
       ^
 IndentationError: expected an indented block
+usage: create_graph_model.py [-h] [--home_directory HOME_DIRECTORY]
+                             [--geo_directory GEO_DIRECTORY]
+                             [--data_directory DATA_DIRECTORY]
+                             [--graph_directory GRAPH_DIRECTORY]
+                             [--graph_model_name GRAPH_MODEL_NAME]
+                             [--file_name FILE_NAME]
+                             [--aggregate_function AGGREGATE_FUNCTION]
+                             [--aggregate_by AGGREGATE_BY]
+                             [--features FEATURES [FEATURES ...]] [--gcp]
+create_graph_model.py: error: argument --data_directory: expected one argument

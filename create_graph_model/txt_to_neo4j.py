@@ -1,3 +1,15 @@
+import argparse
+parser = argparse.ArgumentParser(description="txt_to_neo4j_parser")
+parser.add_argument("--graph_directory", action="store", dest="graph_directory", type=str, help="location of the graph models")
+parser.add_argument("--graph_model_name", action="store", dest="graph_model_name", type=str, help="name of new graph model")
+parser.add_argument('--gcp', action='store_true', dest='gcp', help='affects whether to configure to running on the cloud')
+
+parse_results = parser.parse_args()
+
+graph_directory = parse_results.graph_directory
+graph_model_name = parse_results.graph_model_name
+gcp = parse_results.gcp
+
 """
 set up neo4j graph using queries generated from 
 pynx_to_neo4j.py
@@ -5,7 +17,7 @@ pynx_to_neo4j.py
 
 from py2neo import Graph
 
-with open('../../data/graph_models/neo_queries.txt', 'r') as file:
+with open('{}/{}.txt'.format(graph_directory, graph_model_name), 'r') as file:
     neo = file.read().replace('\n', ' \n')
 
 # establish connection to neo4j

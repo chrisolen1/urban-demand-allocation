@@ -1,0 +1,12 @@
+export HOME_DIR="/Users/chrisolen/Documents/projects/demand-allocation/urban-demand-allocation"
+
+export GEO_DIR="/Users/chrisolen/Documents/projects/demand-allocation/data/geog-bucket"
+
+export RES_DIR="/Users/chrisolen/Documents/projects/demand-allocation/data/res-bucket"
+
+export CRIM_DIR="/Users/chrisolen/Documents/projects/demand-allocation/data/crim-bucket"
+
+export BUS_DIR="/Users/chrisolen/Documents/projects/demand-allocation/data/biz-bucket"
+
+export GRAPH_DIR="/Users/chrisolen/Documents/projects/demand-allocation/data/graph-models"
+

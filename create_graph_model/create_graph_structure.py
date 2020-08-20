@@ -36,6 +36,7 @@ if gcp:
     import gcsfs
     from google.cloud import storage
     storage_client = storage.Client()
+import os
 
 import utilities
 import pynx_to_neo4j
@@ -44,10 +45,7 @@ import aggregate_features
 
 # use polygon json files as naming standard
 if gcp:
-    print("geo_directory:", geo_directory[5:])
-    print("aggregate by:", aggregate_by)
-    geo_bucket =storage_client.get_bucket(geo_directory[5:])
-    print('chicago_{}_reformatted.json'.format(aggregate_by))
+    geo_bucket = storage_client.get_bucket(geo_directory[5:])
     blob = geo_bucket.blob('chicago_{}_reformatted.json'.format(aggregate_by))
     geo = json.loads(blob.download_as_string(client=None))
 
@@ -60,16 +58,64 @@ df = pd.read_csv('{}/{}'.format(data_directory, file_name))
 df_aggregated = \
 aggregate_features.aggregate_features(df, aggregate_function, geo, aggregate_by, *features)
 
+# determine whether a serialized version of this graph_model already exists 
+exists = ""
+if gcp:
+    graph_bucket = storage_client.get_bucket(graph_directory[5:])
+    graph_list = list(graph_bucket.list_blobs())
+    result = [1 if graph_model_name in name else 0 for name in graph_list]
+    if sum(result) == 1:
+        exists = True
+        ix = result.index(1)
+    else:
+        exists = False
 
-# create nodes named after 'aggregate_by' with property value attributes corresponding to df
-# e.g.: neighborhoods, chicago, residential
-G = pynx_to_neo4j.create_pynx_nodes(df_aggregated, node_category=aggregate_by, \
+else:
+    graph_list = os.listdir(graph_directory)
+    result = [1 if graph_model_name in name else 0 for name in graph_list]
+    if sum(result) == 1:
+        exists = True
+        ix = result.index(1)
+    else:
+        exists = False
+
+
+if not exists:
+    
+    # create nodes named after 'aggregate_by' with property value attributes corresponding to df
+    # e.g.: neighborhoods, chicago, residential
+    G = pynx_to_neo4j.create_pynx_nodes(df_aggregated, node_category=aggregate_by, \
                                     attribute_columns=list(df_aggregated.columns))
 
-# create neighborhood to neighborhood edges
-G = pynx_to_neo4j.add_edges_to_pynx(G, "NEXT_TO", utilities.intersection, ["polygon_name_1", "polygon_name_2"], \
+    # create neighborhood to neighborhood edges
+    G = pynx_to_neo4j.add_edges_to_pynx(G, "NEXT_TO", utilities.intersection, ["polygon_name_1", "polygon_name_2"], \
                                     aggregate_by ,bidirectional=True, polygon_dict_1=geo, \
                                     polygon_dict_2=geo)
+
+if exists:
+
+    print("adding to existing graph")
+    if gcp:
+        
+        blob = graph_bucket.blob('{}.pkl'.format(graph_model_name))
+        G = nx.read_gpickle(blob.download_as_string(client=None))
+
+    
+    else:
+        
+        G = nx.read_gpickle("{}/{}.pkl".format(graph_directory, graph_model_name))
+
+    # create nodes named after 'aggregate_by' with property value attributes corresponding to df
+    # e.g.: neighborhoods, chicago, residential
+    G = pynx_to_neo4j.create_pynx_nodes(df_aggregated, node_category=aggregate_by, \
+                                    attribute_columns=list(df_aggregated.columns), existing_graph=G)
+
+    # create neighborhood to neighborhood edges
+    G = pynx_to_neo4j.add_edges_to_pynx(G, "NEXT_TO", utilities.intersection, ["polygon_name_1", "polygon_name_2"], \
+                                    aggregate_by ,bidirectional=True, polygon_dict_1=geo, \
+                                    polygon_dict_2=geo)
+
+
 
 """
 RETURN TO THIS: SEPARATE SCRIPT FOR MULTIPLE GEO FILES
@@ -83,19 +129,16 @@ G = pynx_to_neo4j.add_edges_to_pynx(G, "IS_WITHIN", utilities.intersection, ["po
 
 """
 
-# convert to neo4j query
-neo = pynx_to_neo4j.pynx_to_neo4j_queries(G, return_nodes=True, return_edges=True)
-
-# save as txt file
+# save as pkl file
 if gcp:
-    graph_bucket = storage_client.get_bucket(graph_directory[5:])
-    joined_neo = "\n".join(neo)
-    bucket.blob('{}.txt'.format(graph_model_name)).upload_from_string(joined_neo, 'text/csv')
-
+    # write to disk first
+    nx.write_gpickle(G, "temp/{}.pkl".format(graph_model_name))
+    # then upload to bucket
+    blob = graph_bucket.blob('{}.pkl'.format(graph_model_name))
+    blob.upload_from_filename("temp/{}.pkl".format(graph_model_name))
+    
 else:
-    with open('{}/{}.txt'.format(graph_directory, graph_model_name), 'w') as neo_text:
-        for listitem in neo:
-            neo_text.write('%s\n' % listitem)
+    nx.write_gpickle(G, "{}/{}.pkl".format(graph_directory, graph_model_name))
 
 
 
