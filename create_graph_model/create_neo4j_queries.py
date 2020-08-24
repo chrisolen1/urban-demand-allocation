@@ -14,6 +14,7 @@ gcp = parse_results.gcp
 import sys
 sys.path.append(home_directory)
 
+import os
 import networkx as nx
 if gcp:
 	import gcsfs
