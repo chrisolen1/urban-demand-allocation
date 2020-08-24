@@ -42,7 +42,7 @@ neo = pynx_to_neo4j.pynx_to_neo4j_queries(G, return_nodes=True, return_edges=Tru
 if gcp:
 	graph_bucket = storage_client.get_bucket(graph_directory[5:])
 	joined_neo = "\n".join(neo)
-	bucket.blob('{}.txt'.format(graph_model_name)).upload_from_string(joined_neo, 'text/csv')
+	graph_bucket.blob('{}.txt'.format(graph_model_name)).upload_from_string(joined_neo, 'text/csv')
 
 else:
 	with open('{}/{}.txt'.format(graph_directory, graph_model_name), 'w') as neo_text:
