@@ -16,18 +16,18 @@ sys.path.append(home_directory)
 
 import networkx as nx
 if gcp:
-    import gcsfs
-    from google.cloud import storage
-    graph_bucket = storage_client.get_bucket(graph_directory[5:])
+	import gcsfs
+	from google.cloud import storage
+	graph_bucket = storage_client.get_bucket(graph_directory[5:])
 
 import pynx_to_neo4j
 
 if gcp:
 
 	blob = graph_bucket.blob('{}.pkl'.format(graph_model_name))
-    blob.download_to_filename("{}/create_graph_model/temp/temp.pkl".format(home_directory), client=None)
+	blob.download_to_filename("{}/create_graph_model/temp/temp.pkl".format(home_directory), client=None)
 	G = nx.read_gpickle("{}/create_graph_model/temp/temp.pkl".format(home_directory))
-    os.remove("temp/{}.pkl".format(graph_model_name))
+	os.remove("temp/{}.pkl".format(graph_model_name))
 
 else:
 
@@ -38,11 +38,11 @@ neo = pynx_to_neo4j.pynx_to_neo4j_queries(G, return_nodes=True, return_edges=Tru
 
 # save as txt file
 if gcp:
-    graph_bucket = storage_client.get_bucket(graph_directory[5:])
-    joined_neo = "\n".join(neo)
-    bucket.blob('{}.txt'.format(graph_model_name)).upload_from_string(joined_neo, 'text/csv')
+	graph_bucket = storage_client.get_bucket(graph_directory[5:])
+	joined_neo = "\n".join(neo)
+	bucket.blob('{}.txt'.format(graph_model_name)).upload_from_string(joined_neo, 'text/csv')
 
 else:
-    with open('{}/{}.txt'.format(graph_directory, graph_model_name), 'w') as neo_text:
-        for listitem in neo:
-            neo_text.write('%s\n' % listitem)
+	with open('{}/{}.txt'.format(graph_directory, graph_model_name), 'w') as neo_text:
+		for listitem in neo:
+			neo_text.write('%s\n' % listitem)
