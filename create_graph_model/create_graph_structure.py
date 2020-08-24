@@ -100,6 +100,7 @@ if exists:
         blob = graph_bucket.blob('{}.pkl'.format(graph_model_name))
         blob.download_to_filename("{}/create_graph_model/temp/temp.pkl".format(home_directory), client=None)
         G = nx.read_gpickle("{}/create_graph_model/temp/temp.pkl".format(home_directory))
+        os.remove("{}/create_graph_model/temp/temp.pkl".format(home_directory))
     
     else:
         
@@ -132,10 +133,12 @@ G = pynx_to_neo4j.add_edges_to_pynx(G, "IS_WITHIN", utilities.intersection, ["po
 # save as pkl file
 if gcp:
     # write to disk first
-    nx.write_gpickle(G, "temp/{}.pkl".format(graph_model_name))
+    nx.write_gpickle(G, "{}/create_graph_model/temp/{}.pkl".format(home_directory, graph_model_name))
     # then upload to bucket
     blob = graph_bucket.blob('{}.pkl'.format(graph_model_name))
-    blob.upload_from_filename("temp/{}.pkl".format(graph_model_name))
+    blob.upload_from_filename("{}/create_graph_model/temp/{}.pkl".format(home_directory, graph_model_name))
+    os.remove("{}/create_graph_model/temp/{}.pkl".format(home_directory, graph_model_name))
+
     
 else:
     nx.write_gpickle(G, "{}/{}.pkl".format(graph_directory, graph_model_name))

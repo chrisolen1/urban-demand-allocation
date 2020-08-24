@@ -17,23 +17,34 @@ pynx_to_neo4j.py
 
 from py2neo import Graph
 
-with open('{}/{}.txt'.format(graph_directory, graph_model_name), 'r') as file:
-    neo = file.read().replace('\n', ' \n')
+if gcp:
 
-# establish connection to neo4j
-graph = Graph("bolt://localhost:7687", user="neo4j", password="password")
-print("connected to neo4j server")
+	import gcsfs
+    from google.cloud import storage
+    graph_bucket = storage_client.get_bucket(graph_directory[5:])
+    blob = graph_bucket.blob('{}.pkl'.format(graph_model_name))
+    neo = blob.download_as_string().decode("utf-8").replace('\n', ' \n')
 
-# delete existing graph if one exists
-trans_action = graph.begin()
-statement = "MATCH (n) DETACH DELETE n"
-trans_action.run(statement)
-trans_action.commit()
-print("existing schema deleted")
 
-# run queries
-trans_action = graph.begin()
-statement = neo
-trans_action.run(neo)
-trans_action.commit()
-print("new schema created")
+else:
+
+	with open('{}/{}.txt'.format(graph_directory, graph_model_name), 'r') as file:
+    	neo = file.read().replace('\n', ' \n')
+
+	# establish connection to neo4j
+	graph = Graph("bolt://localhost:7687", user="neo4j", password="password")
+	print("connected to neo4j server")
+
+	# delete existing graph if one exists
+	trans_action = graph.begin()
+	statement = "MATCH (n) DETACH DELETE n"
+	trans_action.run(statement)
+	trans_action.commit()
+	print("existing schema deleted")
+
+	# run queries
+	trans_action = graph.begin()
+	statement = neo
+	trans_action.run(neo)
+	trans_action.commit()
+	print("new schema created")

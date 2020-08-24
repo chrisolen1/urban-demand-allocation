@@ -25,7 +25,8 @@ import pynx_to_neo4j
 if gcp:
 
 	blob = graph_bucket.blob('{}.pkl'.format(graph_model_name))
-	G = nx.read_gpickle(blob.download_as_string(client=None))
+    blob.download_to_filename("{}/create_graph_model/temp/temp.pkl".format(home_directory), client=None)
+	G = nx.read_gpickle("{}/create_graph_model/temp/temp.pkl".format(home_directory))
 
 else:
 
