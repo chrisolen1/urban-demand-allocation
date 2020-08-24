@@ -18,6 +18,7 @@ import networkx as nx
 if gcp:
 	import gcsfs
 	from google.cloud import storage
+	storage_client = storage.Client()
 	graph_bucket = storage_client.get_bucket(graph_directory[5:])
 
 import pynx_to_neo4j
