@@ -34,11 +34,11 @@ class graph_model(object):
 		self.graph_bucket = storage_client.get_bucket(graph_directory[5:])
 
 
-	def create_structure(self, *features_to_aggregate
-						aggregate_by=aggregate_by,
+	def create_structure(self,aggregate_by=aggregate_by,
 						data_directory=data_directory,
 						file_name=file_name,
-						aggregate_function=aggregate_function):
+						aggregate_function=aggregate_function,
+						**feature_function_pairs):
 
 		if gcp:
 			blob = self.geo_bucket.blob('chicago_{}_reformatted.json'.format(aggregate_by))
@@ -48,7 +48,7 @@ class graph_model(object):
         		geo = json.load(f)
 
         df = pd.read_csv('{}/{}'.format(data_directory, file_name))
-        df_aggregated = aggregate_features(df, aggregate_function, geo, aggregate_by, *features_to_aggregate)
+        df_aggregated = aggregate_features(df, geo, aggregate_by, **features_function_pairs)
 
         # determine whether a serialized version of this graph_model already exists 
         exists = ""
@@ -188,7 +188,7 @@ class graph_model(object):
 
 
 
-def aggregate_features(features_dataframe, aggregate_function, geo_shape_file, aggregate_by, *features_to_aggregate):
+def aggregate_features(features_dataframe, geo_shape_file, aggregate_by, **feature_function_pairs):
 	
 	"""
 	Takes a a pandas dataframe of socioeconomic data (e.g. crime, property values)
@@ -212,6 +212,7 @@ def aggregate_features(features_dataframe, aggregate_function, geo_shape_file, a
 
 	unique_geos = list(geo_shape_file.keys())
 	# determine features to retain in dataframe
+	features_to_aggregate = list(feature_function_pairs.keys())
 	features = list(features_to_aggregate) + [aggregate_by]
 	features_dataframe = features_dataframe[features] 
 
@@ -220,32 +221,38 @@ def aggregate_features(features_dataframe, aggregate_function, geo_shape_file, a
 	if 'None' in list(features_dataframe[aggregate_by]):
 
 		features_dataframe = features_dataframe[features_dataframe[aggregate_by] != 'None']
-			   
-	if aggregate_function == "mean":
+	
+	# great new frame of just unique 'aggregate_by' values
+	aggregated_frame = pd.DataFrame({aggregate_by:unique_geos})
+	for feature in features_to_aggregate:
+	
+		if feature_function_pairs[feature] == "mean":
 		
-		# calculate aggregated figures for each neighborhood
-		aggregated = features_dataframe.groupby(aggregate_by)\
-							 [list(features_to_aggregate)].mean()
-		# determine whether there are geographic entities in the json files that are not in the
-		# socioeconomic data
-		additionals = list(set(unique_geos) - set(list(aggregated.index)))
-		for i in additionals:
-			if i != np.nan:
-				aggregated = aggregated.append(pd.Series(name=i))
+			# calculate aggregated figures for each neighborhood
+			aggregated = features_dataframe.groupby(aggregate_by)\
+								 [feature].mean()
+			# determine whether there are geographic entities in the json files that are not in the
+			# seocioeconomic data
+			additionals = list(set(unique_geos) - set(list(aggregated.index)))
+			for i in additionals:
+				if i != np.nan:
+					aggregated = aggregated.append(pd.Series(name=i))
 		
-	elif aggregate_function == "count":
+		elif feature_function_pairs[feature] == "count":
 		
-		# calculate aggregated figures for each neighborhood
-		aggregated = features_dataframe.groupby(aggregate_by)\
-							 [list(features_to_aggregate)].count()
-		# determine whether there are geographic entities in the json files that are not in the
-		# socioeconomic data
-		additionals = list(set(unique_geos) - set(list(aggregated.index)))
-		for i in additionals:
-			if i != np.nan:
-				aggregated = aggregated.append(pd.Series(name=i))
+			# calculate aggregated figures for each neighborhood
+			aggregated = features_dataframe.groupby(aggregate_by)\
+							 [feature].count()
+			# determine whether there are geographic entities in the json files that are not in the
+			# socioeconomic data
+			additionals = list(set(unique_geos) - set(list(aggregated.index)))
+			for i in additionals:
+				if i != np.nan:
+					aggregated = aggregated.append(pd.Series(name=i))
+
+		aggregate_frame = aggregate_frame.merge(aggregated, how='left', on='neighborhood')
 		
-	return aggregated
+	return aggregate_frame
 				
 def create_pynx_nodes(frame, node_category=None, attribute_columns=None, existing_graph=None):
 
