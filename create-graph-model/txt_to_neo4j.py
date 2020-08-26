@@ -25,6 +25,9 @@ if gcp:
     blob = graph_bucket.blob('{}.pkl'.format(graph_model_name))
     neo = blob.download_as_string().decode("utf-8").replace('\n', ' \n')
 
+    # Create a node via cypher-shell
+	#kubectl exec -it "${APP_INSTANCE_NAME}-0" --namespace "${NAMESPACE}" -- cypher-shell -u "neo4j" -p "${NEO4J_PASSWORD}" -d "neo4j" 'CREATE(n:Person { name: "John Doe"})'
+
 
 else:
 
