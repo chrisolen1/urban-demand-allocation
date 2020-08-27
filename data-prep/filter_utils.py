@@ -8,6 +8,13 @@ import multiprocessing as mp
 from tqdm import tqdm 
 from functools import partial
 
+import pyspark
+from pyspark.context import SparkContext
+from pyspark.sql.session import SparkSession
+from pyspark.sql.functions import col
+import gcsfs
+from google.cloud import storage
+
 def standardize_place_names(file_name, data_directory, geo_directory, geo_types, city, n_processes, gcp):
 
 	import utilities
@@ -54,17 +61,9 @@ class spark_filter(object):
 	def __init__(self, n_spark_workers):
 
 
-		import pyspark
-		from pyspark.context import SparkContext
-		from pyspark.sql.session import SparkSession
-		from pyspark.sql.functions import col
-		import gcsfs
-		from google.cloud import storage
-		storage_client = storage.Client()
 
 		self.n_spark_workers = n_spark_workers
 		# connect to cloud storage
-		from google.cloud import storage
 		self.storage_client = storage.Client()
 
 
@@ -163,7 +162,7 @@ class spark_filter(object):
 			'census_tract','marital_status']
 			res = res.select([column for column in res.columns if column not in drop_list])
 			# apply filtering
-			res = res.filter(col("city")==city.upper() | col("city")==city.lower()).filter(col("state")==state.upper() | col("state")==state.lower())
+			res = res.filter((col("city")==city.upper()) | (col("city")==city.lower())).filter((col("state")==state.upper()) | (col("state")==state.lower()))
 			# transfer to pandas
 			res = res.toPandas()
 			print("uploading filtered df to storage")

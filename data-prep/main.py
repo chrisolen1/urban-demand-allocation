@@ -42,11 +42,11 @@ while True:
 		print("Choose either 'residential' or 'crime'")
 	else:
 		if data_type == 'residential':
-				data_directory_complete = data_directory + "/res-bucket"
+				data_directory_complete = data_directory + "res-bucket"
 		elif data_type == 'crime':
-				data_directory_complete = data_directory + "/crim-bucket"
+				data_directory_complete = data_directory + "crim-bucket"
 		elif data_type == 'business':
-				data_directory_complete = data_directory + "/biz-bucket"						
+				data_directory_complete = data_directory + "biz-bucket"						
 		break
 print(data_directory_complete)
 year = int(input("Please list the year you are interested in. Year must be between\
@@ -66,8 +66,10 @@ while True:
 		print("Preparing data...")
 		sf = filter_utils.spark_filter(n_spark_workers)
 		sf.init_session()
-		sf.apply_filter(data_type, year, city)
-		sf.stop_session()
+		sf.apply_filter(data_type, year, city, state=state)
+		print("Ending Spark session...")
+                sf.stop_session()
+                break
 	else:
 		break
 print("This data is already ready to go! Let's see if we need to standardize the place names...")
