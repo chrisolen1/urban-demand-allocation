@@ -68,8 +68,8 @@ while True:
 		sf.init_session()
 		sf.apply_filter(data_type, year, city, state=state)
 		print("Ending Spark session...")
-                sf.stop_session()
-                break
+		sf.stop_session()
+		break
 	else:
 		break
 print("This data is already ready to go! Let's see if we need to standardize the place names...")
