@@ -7,136 +7,145 @@ import sys
 
 import networkx as nx
 from py2neo import Graph
+import re
+from itertools import combinations
+
+from tqdm import tqdm
 
 import utilities
 
 class graph_model(object):
 
-	def __init__(self, home_directory=home_directory,
-			geo_directory=geo_directory,
-			graph_directory=graph_directory,
-			graph_model_name=graph_model_name,
-			gcp=gcp):
+	def __init__(self, home_directory,
+			geo_directory,
+			graph_directory,
+			graph_model_name,
+			gcp):
 
-	self.home_directory = home_directory
-	self.geo_directory = geo_directory
-	self.graph_directory = graph_directory
-	self.graph_model_name = graph_model_name
-	self.gcp = gcp
+		self.home_directory = home_directory
+		self.geo_directory = geo_directory
+		self.graph_directory = graph_directory
+		self.graph_model_name = graph_model_name
+		self.gcp = gcp
 
-	sys.path.append(self.home_directory)
+		sys.path.append(self.home_directory)
 
-	if gcp:
-		import gcsfs
-    	from google.cloud import storage
-    	storage_client = storage.Client()
-		self.geo_bucket = storage_client.get_bucket(geo_directory[5:])
-		self.graph_bucket = storage_client.get_bucket(graph_directory[5:])
+		if self.gcp:
+			import gcsfs
+			from google.cloud import storage
+			storage_client = storage.Client()
+			self.geo_bucket = storage_client.get_bucket(geo_directory[5:])
+			self.graph_bucket = storage_client.get_bucket(graph_directory[5:])
 
 
-	def create_structure(self,aggregate_by=aggregate_by,
-						data_directory=data_directory,
-						file_name=file_name,
-						aggregate_function=aggregate_function,
+	def create_structure(self,aggregate_by,
+						data_directory,
+						file_name,
 						**feature_function_pairs):
 
-		if gcp:
+		if self.gcp:
 			blob = self.geo_bucket.blob('chicago_{}_reformatted.json'.format(aggregate_by))
 			geo = json.loads(blob.download_as_string(client=None))
 		else:
 			with open('{}/chicago_{}_reformatted.json'.format(self.geo_directory, aggregate_by),'r') as f:
-        		geo = json.load(f)
+				geo = json.load(f)
 
-        df = pd.read_csv('{}/{}'.format(data_directory, file_name))
-        df_aggregated = aggregate_features(df, geo, aggregate_by, **features_function_pairs)
+		df = pd.read_csv('{}/{}'.format(data_directory, file_name))
+		df_aggregated = aggregate_features(df, geo, aggregate_by, **feature_function_pairs)
 
-        # determine whether a serialized version of this graph_model already exists 
-        exists = ""
+		# determine whether a serialized version of this graph_model already exists 
+		exists = ""
 		if self.gcp:
-    		graph_list = list(self.graph_bucket.list_blobs())
-    		result = [1 if self.graph_model_name in str(name) else 0 for name in graph_list]
-    		if sum(result) == 1:
-        		exists = True
-        		ix = result.index(1)
-    		else:
-        		exists = False
+			graph_list = list(self.graph_bucket.list_blobs())
+			result = [1 if self.graph_model_name in str(name) else 0 for name in graph_list]
+			if sum(result) >= 1:
+				exists = True
+				ix = result.index(1)
+			else:
+				exists = False
 
 		else:
-    		graph_list = os.listdir(self.graph_directory)
-    		result = [1 if self.graph_model_name in name else 0 for name in graph_list]
-    		if sum(result) == 1:
-        		exists = True
-        		ix = result.index(1)
-    		else:
-        		exists = False
+			graph_list = os.listdir(self.graph_directory)
+			result = [1 if self.graph_model_name in name else 0 for name in graph_list]
+			if sum(result) >= 1:
+				exists = True
+				ix = result.index(1)
+			else:
+				exists = False
 
 
 		if not exists:
-    
-    		# create nodes named after 'aggregate_by' with property value attributes corresponding to df
-    		# e.g.: neighborhoods, chicago, residential
-    		G = create_pynx_nodes(df_aggregated, node_category=aggregate_by,
-                                    attribute_columns=list(df_aggregated.columns))
+	
+			# create nodes named after 'aggregate_by' with property value attributes corresponding to df
+			# e.g.: neighborhoods, chicago, residential
+			G = create_pynx_nodes(df_aggregated, node_category=aggregate_by,
+									attribute_columns=list(df_aggregated.columns))
 
-    		# create neighborhood to neighborhood edges
-    		G = pynx_to_neo4j.add_edges_to_pynx(G, "NEXT_TO", utilities.intersection, ["polygon_name_1", "polygon_name_2"], \
-                                    aggregate_by ,bidirectional=True, polygon_dict_1=geo, \
-                                    polygon_dict_2=geo)
+			# create neighborhood to neighborhood edges
+			G = add_edges_to_pynx(G, "NEXT_TO", utilities.intersection, ["polygon_name_1", "polygon_name_2"], \
+									aggregate_by, bidirectional=True, polygon_dict_1=geo, \
+									polygon_dict_2=geo)
 
 		if exists:
 
-		    print("adding to existing graph")
-    		if self.gcp:
-        
-        		blob = self.graph_bucket.blob('{}.pkl'.format(self.graph_model_name))
-        		blob.download_to_filename("{}/create_graph_model/temp/temp.pkl".format(self.home_directory), client=None)
-        		G = nx.read_gpickle("{}/create_graph_model/temp/temp.pkl".format(self.home_directory))
-        		os.remove("{}/create_graph_model/temp/temp.pkl".format(self.home_directory))
-    
-    		else:
-        
-        		G = nx.read_gpickle("{}/{}.pkl".format(self.graph_directory, self.graph_model_name))
+			print("adding to existing graph")
+			if self.gcp:
+		
+				blob = self.graph_bucket.blob('{}.pkl'.format(self.graph_model_name))
+				os.system("mkdir {}/create_graph_model/temp".format(self.home_directory))
+				blob.download_to_filename("{}/create_graph_model/temp/temp.pkl".format(self.home_directory), client=None)
+				G = nx.read_gpickle("{}/create_graph_model/temp/temp.pkl".format(self.home_directory))
+				os.remove("{}/create_graph_model/temp/temp.pkl".format(self.home_directory))
+				os.system("rmdir {}/create_graph_model/temp".format(self.home_directory))
+	
+			else:
+		
+				G = nx.read_gpickle("{}/{}.pkl".format(self.graph_directory, self.graph_model_name))
 
-    		# create nodes named after 'aggregate_by' with property value attributes corresponding to df
-    		# e.g.: neighborhoods, chicago, residential
-    		G = create_pynx_nodes(df_aggregated, node_category=aggregate_by, 
-                                    attribute_columns=list(df_aggregated.columns), existing_graph=G)
+			# create nodes named after 'aggregate_by' with property value attributes corresponding to df
+			# e.g.: neighborhoods, chicago, residential
+			G = create_pynx_nodes(df_aggregated, node_category=aggregate_by, 
+									attribute_columns=list(df_aggregated.columns), existing_graph=G)
 
-    		# create neighborhood to neighborhood edges
-    		G = add_edges_to_pynx(G, "NEXT_TO", utilities.intersection, ["polygon_name_1", "polygon_name_2"], \
-                                    aggregate_by ,bidirectional=True, polygon_dict_1=geo, \
-                                    polygon_dict_2=geo)
+			# create neighborhood to neighborhood edges
+			G = add_edges_to_pynx(G, "NEXT_TO", utilities.intersection, ["polygon_name_1", "polygon_name_2"], \
+									aggregate_by, bidirectional=True, polygon_dict_1=geo, \
+									polygon_dict_2=geo)
 
 		"""
 		RETURN TO THIS: SEPARATE SCRIPT FOR MULTIPLE GEO FILES
 		# create unidirectional edges between census tract and neighborhood
 		G = pynx_to_neo4j.add_edges_to_pynx(G, "CONTAINS", utilities.intersection, ["polygon_name_1", "polygon_name_2"], \
-                                    "neighborhood", "tract", bidirectional=False, polygon_dict_1=neighborhoods, \
-                                    polygon_dict_2=tracts)
+									"neighborhood", "tract", bidirectional=False, polygon_dict_1=neighborhoods, \
+									polygon_dict_2=tracts)
 		G = pynx_to_neo4j.add_edges_to_pynx(G, "IS_WITHIN", utilities.intersection, ["polygon_name_1", "polygon_name_2"], \
-                                    "tract", "neighborhood", bidirectional=False, polygon_dict_1=tracts, \
-                                    polygon_dict_2=neighborhoods)
+									"tract", "neighborhood", bidirectional=False, polygon_dict_1=tracts, \
+									polygon_dict_2=neighborhoods)
 		"""
 
 		# save as pkl file
 		if self.gcp:
-    		# write to disk first
-    		nx.write_gpickle(G, "{}/create_graph_model/temp/{}.pkl".format(self.home_directory, self.graph_model_name))
-    		# then upload to bucket
-    		blob = self.graph_bucket.blob('{}.pkl'.format(self.graph_model_name))
-    		blob.upload_from_filename("{}/create_graph_model/temp/{}.pkl".format(self.home_directory, self.graph_model_name))
-    		os.remove("{}/create_graph_model/temp/{}.pkl".format(self.home_directory, self.graph_model_name))
-    
+			# write to disk first
+			os.system("mkdir {}/create_graph_model/temp".format(self.home_directory))
+			nx.write_gpickle(G, "{}/create_graph_model/temp/{}.pkl".format(self.home_directory, self.graph_model_name))
+			# then upload to bucket
+			blob = self.graph_bucket.blob('{}.pkl'.format(self.graph_model_name))
+			blob.upload_from_filename("{}/create_graph_model/temp/{}.pkl".format(self.home_directory, self.graph_model_name))
+			os.remove("{}/create_graph_model/temp/{}.pkl".format(self.home_directory, self.graph_model_name))
+			os.system("rmdir {}/create_graph_model/temp".format(self.home_directory))
+	
 		else:
-    		nx.write_gpickle(G, "{}/{}.pkl".format(self.graph_directory, self.graph_model_name))
+			nx.write_gpickle(G, "{}/{}.pkl".format(self.graph_directory, self.graph_model_name))
 
-    def create_neo4j_queries(self):
+	def create_neo4j_queries(self):
 
-    	if self.gcp:
-    		blob = self.graph_bucket.blob('{}.pkl'.format(self.graph_model_name))
-    		blob.download_to_filename("{}/create_graph_model/temp/temp.pkl".format(self.home_directory), client=None)
-    		G = nx.read_gpickle("{}/create_graph_model/temp/temp.pkl".format(self.home_directory))
-    		os.remove("{}/create_graph_model/temp/temp.pkl".format(self.home_directory))
+		if self.gcp:
+			blob = self.graph_bucket.blob('{}.pkl'.format(self.graph_model_name))
+			os.system("mkdir {}/create_graph_model/temp".format(self.home_directory))
+			blob.download_to_filename("{}/create_graph_model/temp/temp.pkl".format(self.home_directory), client=None)
+			G = nx.read_gpickle("{}/create_graph_model/temp/temp.pkl".format(self.home_directory))
+			os.remove("{}/create_graph_model/temp/temp.pkl".format(self.home_directory))
+			os.system("rmdir {}/create_graph_model/temp".format(self.home_directory))
 
 		else:
 			G = nx.read_gpickle("{}/{}.pkl".format(self.graph_directory, self.graph_model_name))
@@ -157,15 +166,15 @@ class graph_model(object):
 	def query_neo4j(self):
 
 		if self.gcp:
-    		blob = self.graph_bucket.blob('{}.pkl'.format(self.graph_model_name))
-    		neo = blob.download_as_string().decode("utf-8").replace('\n', ' \n')
+			blob = self.graph_bucket.blob('{}.pkl'.format(self.graph_model_name))
+			neo = blob.download_as_string().decode("utf-8").replace('\n', ' \n')
 
-    		# Create a node via cypher-shell
+			# Create a node via cypher-shell
 			#kubectl exec -it "${APP_INSTANCE_NAME}-0" --namespace "${NAMESPACE}" -- cypher-shell -u "neo4j" -p "${NEO4J_PASSWORD}" -d "neo4j" 'CREATE(n:Person { name: "John Doe"})'
 
 		else:	
 			with open('{}/{}.txt'.format(self.graph_directory, self.graph_model_name), 'r') as file:
-    			neo = file.read().replace('\n', ' \n')
+				neo = file.read().replace('\n', ' \n')
 
 			# establish connection to neo4j
 			graph = Graph("bolt://localhost:7687", user="neo4j", password="password")
@@ -203,12 +212,13 @@ def aggregate_features(features_dataframe, geo_shape_file, aggregate_by, **featu
 	assert(isinstance(features_dataframe, pd.core.frame.DataFrame)), "\
 			features_dataframe must be a pandas dataframe"
 
+	"""
 	assert(aggregate_function == "count" or aggregate_function == "mean"), "\
 			aggregate function must be either count or mean"
 	
 	assert(aggregate_by == "neighborhood" or aggregate_by == "tract"), "\
 			aggregate_by must be either neighborhood or tract"
-
+	"""
 
 	unique_geos = list(geo_shape_file.keys())
 	# determine features to retain in dataframe
@@ -250,9 +260,10 @@ def aggregate_features(features_dataframe, geo_shape_file, aggregate_by, **featu
 				if i != np.nan:
 					aggregated = aggregated.append(pd.Series(name=i))
 
-		aggregate_frame = aggregate_frame.merge(aggregated, how='left', on='neighborhood')
-		
-	return aggregate_frame
+		aggregated_frame = aggregated_frame.merge(aggregated, how='left', on='neighborhood')
+	
+	aggregated_frame.set_index(aggregate_by, inplace=True)		
+	return aggregated_frame
 				
 def create_pynx_nodes(frame, node_category=None, attribute_columns=None, existing_graph=None):
 
@@ -296,7 +307,8 @@ def create_pynx_nodes(frame, node_category=None, attribute_columns=None, existin
 
 	return G
 
-def add_edges_to_pynx(graph, edge_relationship, criteria_func, criteria_func_node_pair_reference_kwargs, *node_categories, bidirectional=True, **criteria_func_kwargs):
+def add_edges_to_pynx(graph, edge_relationship, criteria_func, criteria_func_node_pair_reference_kwargs, 
+					*node_categories, bidirectional=True, **criteria_func_kwargs):
 
 	"""
 	Add edge relationships to existing pynx
@@ -357,8 +369,8 @@ def add_edges_to_pynx(graph, edge_relationship, criteria_func, criteria_func_nod
 
 		### criteria function must return True or a value in order for the edge relationship to be established ###
 		if criteria_func(**{kwarg1:i[0]},
-                        **{kwarg2:i[1]},
-                        **criteria_func_kwargs):
+						**{kwarg2:i[1]},
+						**criteria_func_kwargs):
 			
 			graph.add_edge(i[0],i[1], **{edge_relationship: {}}) 
 			if bidirectional==True:
