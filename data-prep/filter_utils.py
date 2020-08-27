@@ -23,11 +23,7 @@ def standardize_place_names(home_directory, file_name, data_directory, geo_direc
 	import utilities
 	
 	df = pd.read_csv('{}/{}'.format(data_directory, file_name))
-	print(len(geo_types))
 	for geo_entity in geo_types:
-		print(geo_entity)
-	for geo_entity in geo_types:
-		print(geo_entity)
 		
 		if gcp:
 			import gcsfs
@@ -112,7 +108,11 @@ class spark_filter(object):
 		if state != None:
 			assert(isinstance(state,str)),"\
 				state must be of type str"
-	
+		
+		import gcsfs
+		from google.cloud import storage
+		self.storage_client = storage.Client()
+
 		if data_type == "business":
 			
 			bucket = self.storage_client.get_bucket('biz-bucket')
