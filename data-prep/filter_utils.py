@@ -65,6 +65,8 @@ class spark_filter(object):
 
 		self.n_spark_workers = n_spark_workers
 		# connect to cloud storage
+		import gcsfs
+		from google.cloud import storage
 		self.storage_client = storage.Client()
 
 	def init_session(self):
@@ -108,10 +110,6 @@ class spark_filter(object):
 		if state != None:
 			assert(isinstance(state,str)),"\
 				state must be of type str"
-		
-		import gcsfs
-		from google.cloud import storage
-		self.storage_client = storage.Client()
 
 		if data_type == "business":
 			
