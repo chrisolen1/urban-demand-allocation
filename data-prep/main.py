@@ -4,7 +4,7 @@ parser.add_argument("--home_directory", action="store", dest="home_directory", t
 parser.add_argument("--geo_directory", action="store", dest="geo_directory", type=str, help="location of the geo shapefiles")
 parser.add_argument("--data_directory", action="store", dest="data_directory", type=str, help="location of the relevant data directory")
 parser.add_argument("--n_spark_workers", action="store", dest="n_spark_workers", type=str, help="number of workers to be used for spark session")
-parser.add_argument("--n_processes", action="store", dest="n_cores", type=int, help="number of processes to be used for standardization")
+parser.add_argument("--n_processes", action="store", dest="n_processes", type=int, help="number of processes to be used for standardization")
 parser.add_argument('--gcp', action='store_true', dest='gcp', help='affects whether to configure to running on the cloud')
 
 parse_results = parser.parse_args()
@@ -26,10 +26,12 @@ import filter_utils
 
 city = input("Welcome to the data store! What city would you like to examine?:   ").lower()
 answer = input("Would you like to add a state name to clarify the city? Answer 'yes' or 'no':   ")
+while True:	
 	if answer not in ['yes','no']:
-		print("Answer 'yes' or 'no':   ")
+		answer = input("Answer 'yes' or 'no':   ")
 	elif answer == 'yes':
 		state = input("Indicate the state:   ")
+		break
 	else:
 		state = None
 		break
@@ -46,6 +48,7 @@ while True:
 		elif data_type == 'business':
 				data_directory_complete = data_directory + "/biz-bucket"						
 		break
+print(data_directory_complete)
 year = int(input("Please list the year you are interested in. Year must be between\
 	2010 and 2018. You can select more years later:   "))
 while True:
@@ -57,20 +60,21 @@ if gcp:
 	files_list = list(storage_client.get_bucket(data_directory_complete[5:]).list_blobs())		
 else:
 	files_list = os.listdir(data_directory_complete)
-result = [name if "{}_{}_{}".format(data_type,city,year) in str(name).lower() else None for name in files_list]
+result = [1 if "{}_{}_{}".format(data_type,city,year) in str(name).lower() else 0 for name in files_list]
 while True:
-	if len(result) < 1:
+	if sum(result) < 1:
 		print("Preparing data...")
-		sf = filter_utils.spark_filter()
+		sf = filter_utils.spark_filter(n_spark_workers)
 		sf.init_session()
 		sf.apply_filter(data_type, year, city)
 		sf.stop_session()
 	else:
 		break
 print("This data is already ready to go! Let's see if we need to standardize the place names...")
-result = [name if "{}_{}_{}_standardized".format(data_type,city,year) in str(name).lower() else None for name in files_list]
+result = [1 if "{}_{}_{}_standardized".format(data_type,city,year) in str(name).lower() else 0 for name in files_list]
+print(result)
 while True:
-	if len(result) < 1:
+	if sum(result) < 1:
 		geo_types = list(input("Let's standardize: Which of the following geographic entities would you like\
 			to add to the data set?: 'neighborhood', 'tract'    "))
 		while True:

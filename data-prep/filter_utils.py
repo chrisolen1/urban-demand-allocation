@@ -16,16 +16,16 @@ def standardize_place_names(file_name, data_directory, geo_directory, geo_types,
 
 	for geo_entity in geo_types:
 		if gcp:
-  	  		import gcsfs
-    		from google.cloud import storage
-    		storage_client = storage.Client()
-    		bucket = storage_client.get_bucket(geo_directory[5:])
-    		blob = bucket.blob('{}_{}_reformatted.json'.format(city, geo_entity))
-    		geo = json.loads(blob.download_as_string(client=None))
+			import gcsfs
+			from google.cloud import storage
+			storage_client = storage.Client()
+			bucket = storage_client.get_bucket(geo_directory[5:])
+			blob = bucket.blob('{}_{}_reformatted.json'.format(city, geo_entity))
+			geo = json.loads(blob.download_as_string(client=None))
 
-    	else:	
-    		with open('{}/{}_{}_reformatted.json'.format(geo_directory, city, geo_entity),'r') as f:
-        		geo = json.load(f)
+		else:	
+			with open('{}/{}_{}_reformatted.json'.format(geo_directory, city, geo_entity),'r') as f:
+				geo = json.load(f)
 
 	
 		positions = list(zip(df.longitude, df.latitude))
@@ -51,19 +51,18 @@ def standardize_place_names(file_name, data_directory, geo_directory, geo_types,
 
 class spark_filter(object):
 
-	def __init__(self, n_workers):
+	def __init__(self, n_spark_workers):
 
 
 		import pyspark
 		from pyspark.context import SparkContext
 		from pyspark.sql.session import SparkSession
-		from pyspark.sql.types import *
-
+		from pyspark.sql.functions import col
 		import gcsfs
 		from google.cloud import storage
 		storage_client = storage.Client()
 
-		self.n_workers = n_workers
+		self.n_spark_workers = n_spark_workers
 		# connect to cloud storage
 		from google.cloud import storage
 		self.storage_client = storage.Client()
@@ -74,15 +73,15 @@ class spark_filter(object):
 
 		"""
 		Configure and initialize spark context and spark session
-		:n_workers: str integer
+		:n_spark_workers: str integer
 		Returns: SparkSession, SparkContext objects, respectively
 		"""
 
-		assert(isinstance(n_workers,str)),"\
-		n_workers must be of type str"
+		assert(isinstance(self.n_spark_workers,str)),"\
+		n_spark_workers must be of type str"
 
 		config = pyspark.SparkConf().setAll([("spark.dynamicAllocation.enabled","True"),
-									("spark.executor.cores",n_workers)])
+									("spark.executor.cores",self.n_spark_workers)])
 		self.sc = SparkContext(conf=config)
 		self.ss = SparkSession(self.sc)
 		
@@ -108,7 +107,7 @@ class spark_filter(object):
 		assert(isinstance(city,str)),"\
 		city must be of type str"
 
-		if state not None:
+		if state != None:
 			assert(isinstance(state,str)),"\
 				state must be of type str"
 	
@@ -125,7 +124,7 @@ class spark_filter(object):
 			'parent_actual_employee_size','parent_actual_sales_volume']
 			bus = bus.select([column for column in bus.columns if column not in drop_list])
 			# apply filtering
-			bus = bus.filter(bus['city']==city).filter(bus['archive_version_year']==year)
+			bus = bus.filter(col("city")==city.upper() | col("city")==city.lower()).filter(col("archive_version_year")==year)
 			# transfer to pandas
 			bus = bus.toPandas()
 			# recoding cat variables
@@ -164,7 +163,7 @@ class spark_filter(object):
 			'census_tract','marital_status']
 			res = res.select([column for column in res.columns if column not in drop_list])
 			# apply filtering
-			res = res.filter(res['city']==city).filter(res['state']==state)
+			res = res.filter(col("city")==city.upper() | col("city")==city.lower()).filter(col("state")==state.upper() | col("state")==state.lower())
 			# transfer to pandas
 			res = res.toPandas()
 			print("uploading filtered df to storage")
