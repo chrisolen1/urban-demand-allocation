@@ -172,9 +172,9 @@ class spark_filter(object):
 			# upload to cloud storage    
 			bucket.blob('residential_{}_{}.csv'.format(city, year)).upload_from_string(res.to_csv(index=False), 'text/csv')
 
-	elif data_type == 'crime':
+		elif data_type == 'crime':
 
-		bucket = self.storage_client.get_bucket('crim-bucket')
+			bucket = self.storage_client.get_bucket('crim-bucket')
 			print("reading in spark df")
 			# read to spark df 
 			crime = self.ss.read.csv("gs://crim-bucket/raw_crime_{}.txt".format(city), inferSchema=True, header=False, sep = '\t')
