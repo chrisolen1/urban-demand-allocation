@@ -180,14 +180,14 @@ class spark_filter(object):
 			drop_list = ['Unnamed: 0','case_number', 'date', 'block','iucr',
 			'location_description','beat','district','ward',
 			'community_area','fbi_code','x_coordinate','y_coordinate','updated_on']
-			crime = crime.select([column for column in res.columns if column not in drop_list])
+			crime = crime.select([column for column in crime.columns if column not in drop_list])
 			# apply filtering
 			crime = crime.filter((col("city")==city.upper()) | (col("city")==city.lower())).filter(col("year")==year)
 			# transfer to pandas
 			crime = crime.toPandas()
 			print("uploading filtered df to storage")
 			# upload to cloud storage    
-			bucket.blob('crime_{}_{}.csv'.format(city, year)).upload_from_string(res.to_csv(index=False), 'text/csv')
+			bucket.blob('crime_{}_{}.csv'.format(city, year)).upload_from_string(crime.to_csv(index=False), 'text/csv')
 
 
 
