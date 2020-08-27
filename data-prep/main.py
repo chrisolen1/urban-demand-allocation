@@ -74,7 +74,6 @@ while True:
 		break
 print("This data is already ready to go! Let's see if we need to standardize the place names...")
 result = [1 if "{}_{}_{}_standardized".format(data_type,city,year) in str(name).lower() else 0 for name in files_list]
-print(result)
 while True:
 	if sum(result) < 1:
 		geo_types = list(input("Let's standardize: Which of the following geographic entities would you like\
