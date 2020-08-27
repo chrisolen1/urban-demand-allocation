@@ -78,13 +78,13 @@ while True:
 	if sum(result) < 1:
 		geo_types = list(input("Let's standardize: Which of the following geographic entities would you like\
 			to add to the data set?: 'neighborhood', 'tract'    "))
+		geo_types = geo_types.split(" ")
 		while True:
 			result = any([False if entity not in ['neighborhood','tract'] else True for entity in geo_types])
 			if result:
 				geo_types = input("Choose from the following: 'neighborhood', 'tract'    ")
 				geo_types = geo_types.split(" ")
-				print(geo_types)
-				print(list(geo_types))
+
 			else:
 				break
 		print("Standardizing place names...")

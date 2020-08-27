@@ -25,7 +25,7 @@ def standardize_place_names(home_directory, file_name, data_directory, geo_direc
 	df = pd.read_csv('{}/{}'.format(data_directory, file_name))
 
 	for geo_entity in geo_types:
-		print(geo_entity)
+		
 		if gcp:
 			import gcsfs
 			from google.cloud import storage
@@ -64,13 +64,9 @@ class spark_filter(object):
 
 	def __init__(self, n_spark_workers):
 
-
-
 		self.n_spark_workers = n_spark_workers
 		# connect to cloud storage
 		self.storage_client = storage.Client()
-
-
 
 	def init_session(self):
 
