@@ -13,7 +13,7 @@ from pyspark.context import SparkContext
 from pyspark.sql.session import SparkSession
 from pyspark.sql.functions import col
 import gcsfs
-from google.cloud import storage
+
 
 def standardize_place_names(home_directory, file_name, data_directory, geo_directory, geo_types, city, n_processes, gcp):
 
@@ -23,6 +23,7 @@ def standardize_place_names(home_directory, file_name, data_directory, geo_direc
 	import utilities
 	print(data_directory)
 	print(file_name)
+	print("fuckkkkk", '{}/{}'.format(data_directory, file_name))
 	
 	df = pd.read_csv('{}/{}'.format(data_directory, file_name))
 
