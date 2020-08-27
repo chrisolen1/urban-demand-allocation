@@ -23,10 +23,11 @@ def standardize_place_names(home_directory, file_name, data_directory, geo_direc
 	import utilities
 	
 	df = pd.read_csv('{}/{}'.format(data_directory, file_name))
-
+	print(len(geo_types))
 	for geo_entity in geo_types:
 		print(geo_entity)
 	for geo_entity in geo_types:
+		print(geo_entity)
 		
 		if gcp:
 			import gcsfs
@@ -125,7 +126,7 @@ class spark_filter(object):
 			'parent_actual_employee_size','parent_actual_sales_volume']
 			bus = bus.select([column for column in bus.columns if column not in drop_list])
 			# apply filtering
-			bus = bus.filter(col("city")==city.upper() | col("city")==city.lower()).filter(col("archive_version_year")==year)
+			bus = bus.filter((col("city")==city.upper()) | (col("city")==city.lower())).filter(col("archive_version_year")==year)
 			# transfer to pandas
 			bus = bus.toPandas()
 			# recoding cat variables
@@ -170,3 +171,29 @@ class spark_filter(object):
 			print("uploading filtered df to storage")
 			# upload to cloud storage    
 			bucket.blob('residential_{}_{}.csv'.format(city, year)).upload_from_string(res.to_csv(index=False), 'text/csv')
+
+	elif data_type == 'crime':
+
+		bucket = self.storage_client.get_bucket('crim-bucket')
+			print("reading in spark df")
+			# read to spark df 
+			crime = self.ss.read.csv("gs://crim-bucket/raw_crime_{}.txt".format(city), inferSchema=True, header=False, sep = '\t')
+			# drop currently un-needed columns
+			drop_list = ['Unnamed: 0','case_number', 'date', 'block','iucr',
+			'location_description','beat','district','ward',
+			'community_area','fbi_code','x_coordinate','y_coordinate','updated_on']
+			crime = crime.select([column for column in res.columns if column not in drop_list])
+			# apply filtering
+			crime = crime.filter((col("city")==city.upper()) | (col("city")==city.lower())).filter(col("year")==year)
+			# transfer to pandas
+			crime = crime.toPandas()
+			print("uploading filtered df to storage")
+			# upload to cloud storage    
+			bucket.blob('crime_{}_{}.csv'.format(city, year)).upload_from_string(res.to_csv(index=False), 'text/csv')
+
+
+
+
+
+
+
