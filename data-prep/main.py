@@ -86,7 +86,7 @@ while True:
 				geo_types = geo_types.split(" ")
 			else:
 				break
-		for entity in geotypes:
+		for entity in geo_types:
 			print(entity)
 		print("Standardizing place names...")
 		file_name = "{}_{}_{}.csv".format(data_type, city, year)
