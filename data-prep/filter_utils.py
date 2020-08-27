@@ -18,10 +18,10 @@ from google.cloud import storage
 def standardize_place_names(home_directory, file_name, data_directory, geo_directory, geo_types, city, n_processes, gcp):
 
 	import sys
-
-	import utilities
 	sys.path.append(home_directory)
-
+	
+	import utilities
+	
 	df = pd.read_csv('{}/{}'.format(data_directory, file_name))  
 
 	for geo_entity in geo_types:
