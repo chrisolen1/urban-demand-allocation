@@ -21,10 +21,7 @@ def standardize_place_names(home_directory, file_name, data_directory, geo_direc
 	sys.path.append(home_directory)
 	
 	import utilities
-	print(data_directory)
-	print(file_name)
-	print("fuckkkkk", '{}/{}'.format(data_directory, file_name))
-	print(geo_types)
+	
 	df = pd.read_csv('{}/{}'.format(data_directory, file_name))
 
 	for geo_entity in geo_types:
