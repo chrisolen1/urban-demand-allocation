@@ -84,9 +84,10 @@ while True:
 			if not result:
 				geo_types = input("Choose from the following: 'neighborhood', 'tract'    ")
 				geo_types = geo_types.split(" ")
-
 			else:
 				break
+		for entity in geotypes:
+			print(entity)
 		print("Standardizing place names...")
 		file_name = "{}_{}_{}.csv".format(data_type, city, year)
 		filter_utils.standardize_place_names(home_directory, file_name, data_directory_complete, geo_directory, geo_types, city, n_processes, gcp)
