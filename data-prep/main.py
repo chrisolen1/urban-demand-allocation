@@ -85,7 +85,7 @@ while True:
 			else:
 				break
 		print("Standardizing place names...")
-		file_name = "{}_{}_{}".format(data_type, city, year)
+		file_name = "{}_{}_{}.csv".format(data_type, city, year)
 		filter_utils.standardize_place_names(home_directory, file_name, data_directory, geo_directory, geo_types, city, n_processes, gcp)
 		print("Done!")
 		break
