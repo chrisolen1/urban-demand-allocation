@@ -82,6 +82,7 @@ while True:
 			result = any([False if entity not in ['neighborhood','tract'] else True for entity in geo_types])
 			if result:
 				geo_types = input("Choose from the following: 'neighborhood', 'tract'    ").split(" ")
+				print(geo_types)
 			else:
 				break
 		print("Standardizing place names...")
