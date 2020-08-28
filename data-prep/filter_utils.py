@@ -175,7 +175,7 @@ class spark_filter(object):
 			bucket = self.storage_client.get_bucket('crim-bucket')
 			print("reading in spark df")
 			# read to spark df 
-			crime = self.ss.read.csv("gs://crim-bucket/raw_crime_{}.csv".format(city), inferSchema=True, header=False, sep = '\t')
+			crime = self.ss.read.csv("gs://crim-bucket/raw_crime_{}.csv".format(city), inferSchema=True, header=True, sep = ',')
 			# drop currently un-needed columns
 			drop_list = ['Unnamed: 0','case_number', 'date', 'block','iucr',
 			'location_description','beat','district','ward',
