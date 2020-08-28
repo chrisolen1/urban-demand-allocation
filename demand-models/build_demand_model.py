@@ -1,5 +1,20 @@
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("--home_directory", action="store", dest="home_directory", type=str, help="location of the home directory")
+parser.add_argument("--geo_directory", action="store", dest="geo_directory", type=str, help="location of the geo shapefiles")
+parser.add_argument("--data_directory", action="store", dest="data_directory", type=str, help="location of the relevant data directory")
+parser.add_argument("--graph_directory", action="store", dest="graph_directory", type=str, help="location of the graph models")
+parser.add_argument('--gcp', action='store_true', dest='gcp', help='affects whether to configure to running on the cloud')
+
+parse_results = parser.parse_args()
+home_directory = parse_results.home_directory
+geo_directory = parse_results.geo_directory
+data_directory = parse_results.data_directory
+graph_directory = parse_results.graph_directory
+gcp = parse_results.gcp
+
 import sys
-sys.path.append('/Users/chrisolen/Documents/uchicago_courses/optimization/project/urban-demand-allocation')
+sys.path.append(home_directory)
 
 import pandas as pd
 import numpy as np
