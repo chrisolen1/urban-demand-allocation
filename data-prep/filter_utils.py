@@ -182,7 +182,7 @@ class spark_filter(object):
 			'community_area','fbi_code','x_coordinate','y_coordinate','updated_on']
 			crime = crime.select([column for column in crime.columns if column not in drop_list])
 			# apply filtering
-			crime = crime.filter((col("city")==city.upper()) | (col("city")==city.lower())).filter(col("year")==year)
+			crime = crime.filter(col("year")==year)
 			# transfer to pandas
 			crime = crime.toPandas()
 			print("uploading filtered df to storage")
