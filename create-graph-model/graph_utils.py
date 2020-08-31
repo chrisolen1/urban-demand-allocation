@@ -234,6 +234,7 @@ def aggregate_features(features_dataframe, geo_shape_file, aggregate_by, **featu
 	
 	# great new frame of just unique 'aggregate_by' values
 	aggregated_frame = pd.DataFrame({aggregate_by:unique_geos})
+	
 	for feature in features_to_aggregate:
 	
 		if feature_function_pairs[feature] == "mean":
@@ -241,12 +242,15 @@ def aggregate_features(features_dataframe, geo_shape_file, aggregate_by, **featu
 			# calculate aggregated figures for each neighborhood
 			aggregated = features_dataframe.groupby(aggregate_by)\
 								 [feature].mean()
+		
 			# determine whether there are geographic entities in the json files that are not in the
 			# seocioeconomic data
 			additionals = list(set(unique_geos) - set(list(aggregated.index)))
 			for i in additionals:
 				if i != np.nan:
-					aggregated = aggregated.append(pd.Series(name=i))
+					aggregated = aggregated.append(pd.Series({i:np.nan}, name=feature))
+					aggregated = aggregated.rename_axis(aggregate_by)
+
 		
 		elif feature_function_pairs[feature] == "count":
 		
@@ -258,9 +262,11 @@ def aggregate_features(features_dataframe, geo_shape_file, aggregate_by, **featu
 			additionals = list(set(unique_geos) - set(list(aggregated.index)))
 			for i in additionals:
 				if i != np.nan:
-					aggregated = aggregated.append(pd.Series(name=i))
+					aggregated = aggregated.append(pd.Series({i:np.nan}, name=feature))
+					aggregated = aggregated.rename_axis(aggregate_by)
+					
 
-		aggregated_frame = aggregated_frame.merge(aggregated, how='left', on='neighborhood')
+		aggregated_frame = aggregated_frame.merge(aggregated, how='left', on=aggregate_by)
 	
 	aggregated_frame.set_index(aggregate_by, inplace=True)		
 	return aggregated_frame

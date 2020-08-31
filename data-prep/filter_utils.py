@@ -56,7 +56,7 @@ def standardize_place_names(home_directory, file_name, data_directory, geo_direc
 		df['{}'.format(geo_entity)] = np.array(n)
 
 	print("writing standardized csv")
-	df.to_csv('{}/{}_standardized.csv'.format(data_directory, file_name.replace(".csv","")))  	
+	df.to_csv('{}/{}_standardized.csv'.format(data_directory, file_name.replace(".csv","")), index=False)  	
 
 
 class spark_filter(object):
@@ -176,15 +176,18 @@ class spark_filter(object):
 			print("reading in spark df")
 			# read to spark df 
 			crime = self.ss.read.csv("gs://crim-bucket/raw_crime_{}.csv".format(city), inferSchema=True, header=True, sep = ',')
+			crime = crime.withColumnRenamed('primary_type','crime_type')
 			# drop currently un-needed columns
-			drop_list = ['Unnamed: 0','case_number', 'date', 'block','iucr',
+			drop_list = ['_c0','case_number', 'date', 'block','iucr',
 			'location_description','beat','district','ward',
 			'community_area','fbi_code','x_coordinate','y_coordinate','updated_on']
 			crime = crime.select([column for column in crime.columns if column not in drop_list])
+			print("columns after allegedly fucking filtering", crime.columns)
 			# apply filtering
 			crime = crime.filter(col("year")==year)
 			# transfer to pandas
 			crime = crime.toPandas()
+			print("columns in pandas:", crime.columns)
 			print("uploading filtered df to storage")
 			# upload to cloud storage    
 			bucket.blob('crime_{}_{}.csv'.format(city, year)).upload_from_string(crime.to_csv(index=False), 'text/csv')
