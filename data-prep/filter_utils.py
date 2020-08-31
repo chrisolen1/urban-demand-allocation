@@ -180,12 +180,10 @@ class spark_filter(object):
 			# specify which columns to keep
 			keep_list = ['id','crime_type','description','arrest','domestic','year','latitude','longitude']
 			crime = crime.select([column for column in crime.columns if column in keep_list])
-			print("columns after allegedly fucking filtering", crime.columns)
 			# apply filtering
 			crime = crime.filter(col("year")==year)
 			# transfer to pandas
 			crime = crime.toPandas()
-			print("columns in pandas:", crime.columns)
 			print("uploading filtered df to storage")
 			# upload to cloud storage    
 			bucket.blob('crime_{}_{}.csv'.format(city, year)).upload_from_string(crime.to_csv(index=False), 'text/csv')

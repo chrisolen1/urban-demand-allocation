@@ -77,13 +77,13 @@ result = [1 if "{}_{}_{}_standardized".format(data_type,city,year) in str(name).
 while True:
 	if sum(result) < 1:
 		geo_types = input("Let's standardize: Which of the following geographic entities would you like\
-			to add to the data set?: 'neighborhood', 'tract'    ")
-		geo_types = geo_types.split(" ")
+			to add to the data set?. Put one space between each:   'neighborhood', 'tract'    ")
+		geo_types = geo_types.rstrip().split(" ")
 		while True:
 			result = any([False if entity not in ['neighborhood','tract'] else True for entity in geo_types])
 			if not result:
-				geo_types = input("Choose from the following: 'neighborhood', 'tract'    ")
-				geo_types = geo_types.split(" ")
+				geo_types = input("Choose from the following. Put one space between each:    'neighborhood', 'tract'    ")
+				geo_types = geo_types.rstrip().split(" ")
 			else:
 				break
 		for entity in geo_types:

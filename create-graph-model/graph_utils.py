@@ -57,7 +57,7 @@ class graph_model(object):
 		exists = ""
 		if self.gcp:
 			graph_list = list(self.graph_bucket.list_blobs())
-			result = [1 if self.graph_model_name in str(name) else 0 for name in graph_list]
+			result = [1 if self.graph_model_name+'.pkl' in str(name) else 0 for name in graph_list]
 			if sum(result) >= 1:
 				exists = True
 				ix = result.index(1)
@@ -66,7 +66,7 @@ class graph_model(object):
 
 		else:
 			graph_list = os.listdir(self.graph_directory)
-			result = [1 if self.graph_model_name in name else 0 for name in graph_list]
+			result = [1 if self.graph_model_name+'.pkl' in name else 0 for name in graph_list]
 			if sum(result) >= 1:
 				exists = True
 				ix = result.index(1)
@@ -159,7 +159,7 @@ class graph_model(object):
 			self.graph_bucket.blob('{}.txt'.format(self.graph_model_name)).upload_from_string(joined_neo, 'text/csv')
 
 		else:
-			with open('{}/{}.txt'.format(self.graph_directory, self.graph_model_name), 'w') as neo_text:
+			with open('{}/{}.txt'.format(self.graph_directory, self.graph_model_name), 'w+') as neo_text:
 				for listitem in neo:
 					neo_text.write('%s\n' % listitem)
 
