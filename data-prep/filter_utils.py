@@ -117,12 +117,12 @@ class spark_filter(object):
 			print("reading in spark df")
 			# read to spark df
 			bus = self.ss.read.csv("gs://biz-bucket/raw_business.csv", inferSchema=True, header=True, sep = ',')
-			# drop currently un-needed columns
-			drop_list = ['ticker', 'address_line_1','location_employee_size_code',
-			'location_sales_volume_code','sic_code','sic6_descriptions_sic','office_size_code',
-			'parent_employee_size_code','parent_sales_volume_code','census_tract','cbsa_code',
-			'parent_actual_employee_size','parent_actual_sales_volume']
-			bus = bus.select([column for column in bus.columns if column not in drop_list])
+			bus = bus.withColumnRenamed('archive_version_year','year')
+			# specify which columns to keep
+			keep_list = ['year', 'abi',	'company', 'city', 'zipcode', 'primary_naics_code', 'business_status_code',	
+						'company_holding_status', 'year_established', 'employee_size_location', 'sales_volume_location',
+						'latitude', 'longitude', 'neighborhood']
+			bus = bus.select([column for column in bus.columns if column in keep_list])
 			# apply filtering
 			bus = bus.filter((col("city")==city.upper()) | (col("city")==city.lower())).filter(col("archive_version_year")==year)
 			# transfer to pandas
@@ -157,11 +157,11 @@ class spark_filter(object):
 				.withColumnRenamed('_18','vacant').withColumnRenamed('_c19','latitude')\
 				.withColumnRenamed('_c20','longitude').withColumnRenamed('_c21','census_tract')\
 				.withColumnRenamed('_c22','ethnicity_code').withColumnRenamed('_c23','year')
-			# drop currently un-needed columns
-			drop_list = ['street_number', 'street_post_direction', 'street_type','unit_number',
-			'location_sales_volume_code','sic_code','sic6_descriptions_sic','office_size_code',
-			'census_tract','marital_status']
-			res = res.select([column for column in res.columns if column not in drop_list])
+			# specify which columns to keep
+			keep_list = ['household_id', 'location_type', 'length_of_residence', 'children_count', 'hh_wealth', 'hh_income', 
+						'owner_renter_status', 'property_value', 'street_pre_direction', 'street_name', 'unit_type', 'city', 
+						'state', 'vacant', 'latitude', 'longitude', 'ethnicity_code']
+			res = res.select([column for column in res.columns if column in keep_list])
 			# apply filtering
 			res = res.filter((col("city")==city.upper()) | (col("city")==city.lower())).filter((col("state")==state.upper()) | (col("state")==state.lower()))
 			# transfer to pandas
@@ -177,7 +177,7 @@ class spark_filter(object):
 			# read to spark df 
 			crime = self.ss.read.csv("gs://crim-bucket/raw_crime_{}.csv".format(city), inferSchema=True, header=True, sep = ',')
 			crime = crime.withColumnRenamed('primary_type','crime_type')
-			# drop currently un-needed columns
+			# specify which columns to keep
 			keep_list = ['id','crime_type','description','arrest','domestic','year','latitude','longitude']
 			crime = crime.select([column for column in crime.columns if column in keep_list])
 			print("columns after allegedly fucking filtering", crime.columns)
