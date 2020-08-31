@@ -178,10 +178,8 @@ class spark_filter(object):
 			crime = self.ss.read.csv("gs://crim-bucket/raw_crime_{}.csv".format(city), inferSchema=True, header=True, sep = ',')
 			crime = crime.withColumnRenamed('primary_type','crime_type')
 			# drop currently un-needed columns
-			drop_list = ['_c0','case_number', 'date', 'block','iucr',
-			'location_description','beat','district','ward',
-			'community_area','fbi_code','x_coordinate','y_coordinate','updated_on']
-			crime = crime.select([column for column in crime.columns if column not in drop_list])
+			keep_list = ['id','crime_type','description','arrest','domestic','year','latitude','longitude']
+			crime = crime.select([column for column in crime.columns if column in keep_list])
 			print("columns after allegedly fucking filtering", crime.columns)
 			# apply filtering
 			crime = crime.filter(col("year")==year)
