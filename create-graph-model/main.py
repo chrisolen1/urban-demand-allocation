@@ -58,7 +58,7 @@ while True:
 			if name != None:
 				results.append(name) 
 		file_name = input("Choose one of the following data sources, {}:   ".format(results))
-		if file_name not in result:
+		if file_name not in results:
 			print("Choose one of the following data sources, {}:   ".format(results))
 		else:
 			break
