@@ -43,12 +43,13 @@ while True:
 	else:
 		if data_type == 'residential':
 				data_directory_complete = data_directory + "res-bucket"
+				print("data directory:", data_directory_complete)
 		elif data_type == 'crime':
 				data_directory_complete = data_directory + "crim-bucket"
 		elif data_type == 'business':
 				data_directory_complete = data_directory + "biz-bucket"						
 		break
-print(data_directory_complete)
+print("data directory:", data_directory_complete)
 year = int(input("Please list the year you are interested in. Year must be between\
 	2010 and 2018. You can select more years later:   "))
 while True:
