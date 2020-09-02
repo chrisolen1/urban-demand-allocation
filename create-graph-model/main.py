@@ -48,7 +48,7 @@ while True:
 	while True:
 		if gcp:
 			files_list = list(storage_client.get_bucket(data_directory_complete[5:]).list_blobs())
-			result = [str(name).split(',')[1] if "standardized" in str(name) else None for name in files_list]
+			result = [str(name).split(',')[1].replace(" ","") if "standardized" in str(name) else None for name in files_list]
 		else:
 			files_list = os.listdir(data_directory_complete)
 			result = [name if "standardized" in str(name) else None for name in files_list]
