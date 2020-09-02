@@ -171,7 +171,10 @@ class graph_model(object):
 			neo = blob.download_as_string().decode("utf-8").split('\n')[:-1]
 			os.system("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain 'MATCH (n) DETACH DELETE n'")
 			print("existing graph deleted")
-			result_list = self.run_imap_multiprocessing(func=self.neo_query, argument_list=neo, num_processes=8)
+			print(type(neo))
+			print(len(neo))
+			print(neo)
+			result_list = self.run_imap_multiprocessing(func=self.neo_query, argument_list=neo, num_processes=4)
 						
 
 		else:	
