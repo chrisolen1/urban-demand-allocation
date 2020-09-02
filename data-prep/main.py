@@ -14,6 +14,9 @@ data_directory = parse_results.data_directory
 n_spark_workers = parse_results.n_spark_workers
 n_processes = parse_results.n_processes
 gcp = parse_results.gcp
+print("data_directory", data_directory)
+print("gcp",gcp)
+
 
 import os
 
@@ -21,6 +24,7 @@ if gcp:
 	import gcsfs
 	from google.cloud import storage
 	storage_client = storage.Client()
+	print("storage_client",storage_client)
 
 import filter_utils	
 
@@ -46,6 +50,7 @@ while True:
 				print("data directory:", data_directory_complete)
 		elif data_type == 'crime':
 				data_directory_complete = data_directory + "crim-bucket"
+				print("data directory:", data_directory_complete)
 		elif data_type == 'business':
 				data_directory_complete = data_directory + "biz-bucket"						
 		break
