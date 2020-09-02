@@ -168,53 +168,28 @@ class graph_model(object):
 
 		if self.gcp:
 			blob = self.graph_bucket.blob('{}.txt'.format(self.graph_model_name))
-			neo = blob.download_as_string().decode("utf-8").split('\n')
-			pool = mp.Pool(processes=len(neo))
-			chunksize = 20
+			neo = blob.download_as_string().decode("utf-8").split('\n')[:-1]
 			os.system("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain 'MATCH (n) DETACH DELETE n'")
-			tqdm(pool.imap(self.neo_query, neo, chunksize), total=len(neo))
+			print("existing graph deleted")
+			result_list = self.run_imap_multiprocessing(func=self.neo_query, argument_list=neo, num_processes=8)
 						
 
 		else:	
 			with open('{}/{}.txt'.format(self.graph_directory, self.graph_model_name), 'r') as file:
-				neo = file.read().split('\n')
-			pool = mp.Pool(processes=8)
-			chunksize = 20
-
-			tqdm(pool.imap_unordered(self.neo_query, neo), total=len(neo))
+				neo = file.read().split('\n')[:-1]
+			os.system("cypher-shell -u 'neo4j' -p 'password' --format plain 'MATCH (n) DETACH DELETE n'")	
+			print("existing graph deleted")
+			result_list = self.run_imap_multiprocessing(func=self.neo_query, argument_list=neo, num_processes=8)
 			
-			"""
-			tqdm(pool.imap(self.neo_query, neo, chunksize), total=len(neo))
-			"""
-			"""
-			os.system("cypher-shell -u 'neo4j' -p 'password' 'MATCH (n) DETACH DELETE n'")
-			for i in tqdm(range(len(neo))):
-				self.neo_query(neo[i])
-			"""
-			"""
-			
-			"""
+	def run_imap_multiprocessing(self, func, argument_list, num_processes):
 
+		pool = mp.Pool(processes=num_processes)
 
-			"""
-			# establish connection to neo4j
-			graph = Graph("bolt://localhost:7687", user="neo4j", password="password")
-			print("connected to neo4j server")
+		result_list_tqdm = []
+		for result in tqdm(pool.imap(func=func, iterable=argument_list), total=len(argument_list)):
+			result_list_tqdm.append(result)
 
-			# delete existing graph if one exists
-			trans_action = graph.begin()
-			statement = "MATCH (n) DETACH DELETE n"
-			trans_action.run(statement)
-			trans_action.commit()
-			print("existing schema deleted")
-
-			# run queries
-			trans_action = graph.begin()
-			statement = neo
-			trans_action.run(neo)
-			trans_action.commit()
-			print("new schema created")
-			"""
+		return result_list_tqdm			
 
 	def neo_query(self, query_string):		
 
@@ -223,7 +198,7 @@ class graph_model(object):
 			os.system("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string))
 
 		else:
-			print(query_string)
+			
 			os.system("cypher-shell -u 'neo4j' -p 'password' --format plain '{}'".format(query_string))	
 		
 
@@ -327,7 +302,6 @@ def create_pynx_nodes(frame, node_category=None, attribute_columns=None, existin
 	else:
 		G = existing_graph
 
-	#frame.set_index(pd.Series(frame.index).apply(remove_apostrophe), inplace=True)
 	nodes = list(frame.index)
 
 	# create nodes with default
@@ -409,9 +383,29 @@ def add_edges_to_pynx(graph, edge_relationship, criteria_func, criteria_func_nod
 						**{kwarg2:i[1]},
 						**criteria_func_kwargs):
 			
-			graph.add_edge(i[0],i[1], **{edge_relationship: {}}) 
-			if bidirectional==True:
-				graph.add_edge(i[1],i[0], **{edge_relationship: {}}) 
+			# is there an edge relationship already between these two nodes?
+			summy = [1 if list(graph.edges)[j][0] == i[0] and list(graph.edges)[j][1] == i[1] else 0 for j in range(len(list(graph.edges)))]
+			
+			# if there is:
+			if sum(summy) >= 1:
+				# return each one of them
+				relevant_ix = [k for k,x in enumerate(summy) if x == 1]
+				
+				# check the nature of the existing edge relationships
+				for l in relevant_ix:
+					# if the existing edge relationship is the same as the one we're trying to add, skip
+					if list(list(graph.edges.data())[l][2].keys())[0] == edge_relationship:
+						
+						pass
+					# otherwise, go ahead and add 
+					else: 
+						graph.add_edge(i[0],i[1], **{edge_relationship: {}}) 
+						if bidirectional==True:
+							graph.add_edge(i[1],i[0], **{edge_relationship: {}}) 
+			else: 
+				graph.add_edge(i[0],i[1], **{edge_relationship: {}}) 
+				if bidirectional==True:
+					graph.add_edge(i[1],i[0], **{edge_relationship: {}}) 
 
 	return graph
 
@@ -454,13 +448,6 @@ def pynx_to_neo4j_queries(graph, return_nodes=True, return_edges=True):
 
 	nx_edges = list(graph.edges.data())
 	print("creating edge queries")
-
-	"""
-	neo_edges = ['MATCH (a:{}) WHERE a.name = "{}" MATCH (b:{}) WHERE b.name = "{}" '\
-	.format(nx_nodes[node_names.index(i[0])][1]['node_category'], i[0], nx_nodes[node_names.index(i[1])][1]['node_category'], i[1]) + \
-	"WITH a, b CREATE " + "(" + re.sub(r'\W+','',i[0]) + ")" + "-[:" + list(i[2].keys())[0] + " " + \
-	str(list(i[2].values())[0]) + "]" + "->" + "(" + re.sub(r'\W+','',i[1]) + ")" for i in tqdm(nx_edges)]
-	"""
 	
 	neo_edges = ['MATCH (a) WHERE a.name = "{}" MATCH (b) WHERE b.name = "{}" '\
 	.format(i[0].replace("'",""), i[1].replace("'","")) + \
@@ -476,9 +463,6 @@ def pynx_to_neo4j_queries(graph, return_nodes=True, return_edges=True):
 		neo = neo_edges
 	return neo 
 
-def remove_apostrophe(row):
-
-	return row.replace("'","")
 
 
 	

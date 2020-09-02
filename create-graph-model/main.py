@@ -37,7 +37,7 @@ while True:
 	while True:
 		data_type = input("Choose the category of data to add to your graph from 'residential', 'crime':   ")
 		if data_type not in ['residential','crime']:
-			print("Choose either 'residential' or 'crime'")
+			print("Choose either 'residential' or 'crime':   ")
 		else:
 			if data_type == 'residential':
 				data_directory_complete = data_directory + "/res-bucket"
@@ -52,9 +52,9 @@ while True:
 			files_list = os.listdir(data_directory_complete)
 
 		result = [name if "standardized" in str(name) else None for name in files_list]
-		file_name = input("Choose one of the following data sources: {}   ".format(result))
+		file_name = input("Choose one of the following data sources, {}:   ".format(result))
 		if file_name not in result:
-			print("Choose one of the following data sources: {}   ".format(result))
+			print("Choose one of the following data sources, {}:   ".format(result))
 		else:
 			break
 	# determine geographic entity on which to aggregate
@@ -68,18 +68,18 @@ while True:
 	while True:
 		df = pd.read_csv("{}/{}".format(data_directory_complete, file_name))
 		cols = df.columns
-		features = input("List the features that you would like to aggregate from the following. Add one space between each one:   {}".format(cols)).rstrip().split(" ")
+		features = input("List the features that you would like to aggregate from the following. Add one space between each one, {}:   ".format(cols)).rstrip().split(" ")
 		features = [feat.replace(" ","") for feat in features]
 		overlap = list(set(features) - set(cols))
 		if len(overlap) != 0:
-			print("{} is/are not feature option(s)   ".format(overlap))
+			print("{} is/are not feature option(s):   ".format(overlap))
 		else:
 			feature_function_pairs = {}
 			for feature in features:
 				while True:
 					aggregate_function = input("Choose an aggregating function for chosen feature, {}, from 'mean', 'count':   ".format(feature))
 					if aggregate_function not in ['mean','count']:
-						print("Choose either 'mean' or 'count   ")
+						print("Choose either 'mean' or 'count:   ")
 					else:
 						break
 				feature_function_pairs.update({feature: aggregate_function})
