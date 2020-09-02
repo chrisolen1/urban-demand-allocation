@@ -14,9 +14,6 @@ data_directory = parse_results.data_directory
 n_spark_workers = parse_results.n_spark_workers
 n_processes = parse_results.n_processes
 gcp = parse_results.gcp
-print("data_directory", data_directory)
-print("gcp",gcp)
-
 
 import os
 
@@ -24,7 +21,7 @@ if gcp:
 	import gcsfs
 	from google.cloud import storage
 	storage_client = storage.Client()
-	print("storage_client",storage_client)
+	
 
 import filter_utils	
 
@@ -47,14 +44,14 @@ while True:
 	else:
 		if data_type == 'residential':
 				data_directory_complete = data_directory + "res-bucket"
-				print("data directory:", data_directory_complete)
+				
 		elif data_type == 'crime':
 				data_directory_complete = data_directory + "crim-bucket"
-				print("data directory:", data_directory_complete)
+				
 		elif data_type == 'business':
 				data_directory_complete = data_directory + "biz-bucket"						
 		break
-print("data directory:", data_directory_complete)
+
 year = int(input("Please list the year you are interested in. Year must be between\
 	2010 and 2018. You can select more years later:   "))
 while True:
@@ -93,7 +90,7 @@ while True:
 			else:
 				break
 		for entity in geo_types:
-			print(entity)
+			
 		print("Standardizing place names...")
 		file_name = "{}_{}_{}.csv".format(data_type, city, year)
 		filter_utils.standardize_place_names(home_directory, file_name, data_directory_complete, geo_directory, geo_types, city, n_processes, gcp)

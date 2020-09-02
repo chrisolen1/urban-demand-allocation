@@ -40,9 +40,9 @@ while True:
 			print("Choose either 'residential' or 'crime':   ")
 		else:
 			if data_type == 'residential':
-				data_directory_complete = data_directory + "/res-bucket"
+				data_directory_complete = data_directory + "res-bucket"
 			elif data_type == 'crime':
-				data_directory_complete = data_directory + "/crim-bucket"
+				data_directory_complete = data_directory + "crim-bucket"
 			break
 	# determine data sources by file
 	while True:
