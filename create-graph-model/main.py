@@ -48,13 +48,18 @@ while True:
 	while True:
 		if gcp:
 			files_list = list(storage_client.get_bucket(data_directory_complete[5:]).list_blobs())
+			result = [str(name).split(',')[1] if "standardized" in str(name) else None for name in files_list]
 		else:
 			files_list = os.listdir(data_directory_complete)
+			result = [name if "standardized" in str(name) else None for name in files_list]
 
-		result = [name if "standardized" in str(name) else None for name in files_list]
-		file_name = input("Choose one of the following data sources, {}:   ".format(result))
+		results = []
+		for name in result:
+			if name != None:
+			results.append(name) 
+		file_name = input("Choose one of the following data sources, {}:   ".format(results))
 		if file_name not in result:
-			print("Choose one of the following data sources, {}:   ".format(result))
+			print("Choose one of the following data sources, {}:   ".format(results))
 		else:
 			break
 	# determine geographic entity on which to aggregate
