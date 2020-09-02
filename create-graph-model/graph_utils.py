@@ -10,6 +10,7 @@ from py2neo import Graph
 import re
 from itertools import combinations
 
+import multiprocessing as mp
 from tqdm import tqdm
 
 import utilities
@@ -166,16 +167,36 @@ class graph_model(object):
 	def query_neo4j(self):
 
 		if self.gcp:
-			blob = self.graph_bucket.blob('{}.pkl'.format(self.graph_model_name))
-			neo = blob.download_as_string().decode("utf-8").replace('\n', ' \n')
-
-			# Create a node via cypher-shell
-			#kubectl exec -it "${APP_INSTANCE_NAME}-0" --namespace "${NAMESPACE}" -- cypher-shell -u "neo4j" -p "${NEO4J_PASSWORD}" -d "neo4j" 'CREATE(n:Person { name: "John Doe"})'
+			blob = self.graph_bucket.blob('{}.txt'.format(self.graph_model_name))
+			neo = blob.download_as_string().decode("utf-8").split('\n')
+			pool = mp.Pool(processes=len(neo))
+			chunksize = 20
+			os.system("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain 'MATCH (n) DETACH DELETE n'")
+			tqdm(pool.imap(self.neo_query, neo, chunksize), total=len(neo))
+						
 
 		else:	
 			with open('{}/{}.txt'.format(self.graph_directory, self.graph_model_name), 'r') as file:
-				neo = file.read().replace('\n', ' \n')
+				neo = file.read().split('\n')
+			pool = mp.Pool(processes=8)
+			chunksize = 20
 
+			tqdm(pool.imap_unordered(self.neo_query, neo), total=len(neo))
+			
+			"""
+			tqdm(pool.imap(self.neo_query, neo, chunksize), total=len(neo))
+			"""
+			"""
+			os.system("cypher-shell -u 'neo4j' -p 'password' 'MATCH (n) DETACH DELETE n'")
+			for i in tqdm(range(len(neo))):
+				self.neo_query(neo[i])
+			"""
+			"""
+			
+			"""
+
+
+			"""
 			# establish connection to neo4j
 			graph = Graph("bolt://localhost:7687", user="neo4j", password="password")
 			print("connected to neo4j server")
@@ -193,9 +214,18 @@ class graph_model(object):
 			trans_action.run(neo)
 			trans_action.commit()
 			print("new schema created")
+			"""
 
+	def neo_query(self, query_string):		
 
+		if self.gcp:
+			
+			os.system("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string))
 
+		else:
+			print(query_string)
+			os.system("cypher-shell -u 'neo4j' -p 'password' --format plain '{}'".format(query_string))	
+		
 
 def aggregate_features(features_dataframe, geo_shape_file, aggregate_by, **feature_function_pairs):
 	
@@ -297,6 +327,7 @@ def create_pynx_nodes(frame, node_category=None, attribute_columns=None, existin
 	else:
 		G = existing_graph
 
+	#frame.set_index(pd.Series(frame.index).apply(remove_apostrophe), inplace=True)
 	nodes = list(frame.index)
 
 	# create nodes with default
@@ -398,6 +429,7 @@ def pynx_to_neo4j_queries(graph, return_nodes=True, return_edges=True):
 	"""
 
 	nx_nodes = list(graph.nodes.data())
+	node_names = [nx_nodes[i][0] for i in range(len(nx_nodes))]
 	neo_nodes = []
 
 	print("creating node queries")
@@ -406,7 +438,7 @@ def pynx_to_neo4j_queries(graph, return_nodes=True, return_edges=True):
 		n_attributes = len(list(i[1].values())) 
 
 		root_info = "CREATE " + "(" + "%s" + ":" + "%s" + " {" + "%s" + ":" + '"' + "%s" + '"'
-		root_info = root_info % (re.sub(r'\W+','', i[0]), i[1]['node_category'], list(i[1].keys())[0], list(i[1].values())[0])
+		root_info = root_info % (re.sub(r'\W+','', i[0]), i[1]['node_category'], list(i[1].keys())[0], list(i[1].values())[0].replace("'",""))
 
 		end_string = "}" + ")"
 
@@ -422,8 +454,20 @@ def pynx_to_neo4j_queries(graph, return_nodes=True, return_edges=True):
 
 	nx_edges = list(graph.edges.data())
 	print("creating edge queries")
-	neo_edges = ["CREATE " + "(" + re.sub(r'\W+','',i[0]) + ")" + "-[:" + list(i[2].keys())[0] + " " + str(list(i[2].values())[0]) + "]" + "->" + "(" + re.sub(r'\W+','',i[1]) + ")" for i in tqdm(nx_edges)]
+
+	"""
+	neo_edges = ['MATCH (a:{}) WHERE a.name = "{}" MATCH (b:{}) WHERE b.name = "{}" '\
+	.format(nx_nodes[node_names.index(i[0])][1]['node_category'], i[0], nx_nodes[node_names.index(i[1])][1]['node_category'], i[1]) + \
+	"WITH a, b CREATE " + "(" + re.sub(r'\W+','',i[0]) + ")" + "-[:" + list(i[2].keys())[0] + " " + \
+	str(list(i[2].values())[0]) + "]" + "->" + "(" + re.sub(r'\W+','',i[1]) + ")" for i in tqdm(nx_edges)]
+	"""
 	
+	neo_edges = ['MATCH (a) WHERE a.name = "{}" MATCH (b) WHERE b.name = "{}" '\
+	.format(i[0].replace("'",""), i[1].replace("'","")) + \
+	"CREATE " + "(a)" + "-[:" + list(i[2].keys())[0] + " " + \
+	str(list(i[2].values())[0]) + "]" + "->" + "(b)" for i in tqdm(nx_edges)]
+	
+
 	if return_nodes and return_edges:
 		neo = neo_nodes + neo_edges
 	elif return_nodes and not return_edges:
@@ -431,6 +475,10 @@ def pynx_to_neo4j_queries(graph, return_nodes=True, return_edges=True):
 	elif not return_nodes and return_edges:
 		neo = neo_edges
 	return neo 
+
+def remove_apostrophe(row):
+
+	return row.replace("'","")
 
 
 	
