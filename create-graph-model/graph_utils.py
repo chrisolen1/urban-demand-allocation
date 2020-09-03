@@ -174,7 +174,8 @@ class graph_model(object):
 			os.system("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain 'MATCH (n) DETACH DELETE n'")
 			print("existing graph deleted")
 			nq = partial(neo_query, gcp=True)
-			result_list = self.run_imap_multiprocessing(func=nq, argument_list=neo, num_processes=4)
+			chunksize=15
+			result_list = self.run_imap_multiprocessing(func=nq, argument_list=neo, num_processes=os.cpu_count(), chunksize=chunksize)
 						
 
 		else:	
@@ -182,14 +183,15 @@ class graph_model(object):
 				neo = file.read().split('\n')[:-1]
 			os.system("cypher-shell -u 'neo4j' -p 'password' --format plain 'MATCH (n) DETACH DELETE n'")	
 			print("existing graph deleted")
-			result_list = self.run_imap_multiprocessing(func=neo_query, argument_list=neo, num_processes=8)
+			chunksize=15
+			result_list = self.run_imap_multiprocessing(func=neo_query, argument_list=neo, num_processes=os.cpu_count(), chunksize=chunksize)
 	
-	def run_imap_multiprocessing(self, func, argument_list, num_processes):
+	def run_imap_multiprocessing(self, func, argument_list, num_processes, chunksize=10):
 
 		pool = mp.Pool(processes=num_processes)
 
 		result_list_tqdm = []
-		for result in tqdm(pool.imap(func=func, iterable=argument_list), total=len(argument_list)):
+		for result in tqdm(pool.imap(func=func, iterable=argument_list, chunksize=chunksize), total=len(argument_list)):
 			result_list_tqdm.append(result)
 
 		return result_list_tqdm			

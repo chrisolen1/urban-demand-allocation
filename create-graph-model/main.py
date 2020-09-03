@@ -45,22 +45,26 @@ while True:
 				data_directory_complete = data_directory + "crim-bucket"
 			break
 	# determine data sources by file
-	while True:
-		if gcp:
-			files_list = list(storage_client.get_bucket(data_directory_complete[5:]).list_blobs())
-			result = [str(name).split(',')[1].replace(" ","") if "standardized" in str(name) else None for name in files_list]
-		else:
-			files_list = os.listdir(data_directory_complete)
-			result = [name if "standardized" in str(name) else None for name in files_list]
+	if gcp:
+		files_list = list(storage_client.get_bucket(data_directory_complete[5:]).list_blobs())
+		result = [str(name).split(',')[1].replace(" ","") if "standardized" in str(name) else None for name in files_list]
+	else:
+		files_list = os.listdir(data_directory_complete)
+		result = [name if "standardized" in str(name) else None for name in files_list]
 
-		results = []
-		for name in result:
-			if name != None:
-				results.append(name) 
-		file_name = input("Choose one of the following data sources, {}:   ".format(results))
-		if file_name not in results:
-			print("Choose one of the following data sources, {}:   ".format(results))
+	results = []
+	for name in result:
+		if name != None:
+			results.append(name) 
+
+	results = {a:b for (a,b) in list(enumerate(results))}
+	print(list(results.keys()))
+	while True:
+		file_number = int(input("Choose the number corresponding to one of the following data sources, {}:   ".format(str(results))))
+		if file_number not in list(results.keys()):
+			print("Choose the number corresponding to one of the following data sources, {}:   ".format(str(results)))
 		else:
+			file_name = results[file_number]
 			break
 	# determine geographic entity on which to aggregate
 	while True:
