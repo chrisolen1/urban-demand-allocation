@@ -194,7 +194,7 @@ class graph_model(object):
 	@staticmethod
 	def neo_query(query_string):		
 
-		if graph_model.gcp:
+		if graph_model().gcp:
 			
 			os.system("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string))
 
