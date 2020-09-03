@@ -13,6 +13,8 @@ from itertools import combinations
 import multiprocessing as mp
 from tqdm import tqdm
 
+from functools import partial
+
 import utilities
 
 class graph_model(object):
@@ -171,7 +173,7 @@ class graph_model(object):
 			neo = blob.download_as_string().decode("utf-8").split('\n')[:-1]
 			os.system("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain 'MATCH (n) DETACH DELETE n'")
 			print("existing graph deleted")
-			result_list = self.run_imap_multiprocessing(func=graph_model.neo_query, argument_list=neo, num_processes=4)
+			result_list = self.run_imap_multiprocessing(func=neo_query, argument_list=neo, num_processes=4)
 						
 
 		else:	
@@ -179,7 +181,8 @@ class graph_model(object):
 				neo = file.read().split('\n')[:-1]
 			os.system("cypher-shell -u 'neo4j' -p 'password' --format plain 'MATCH (n) DETACH DELETE n'")	
 			print("existing graph deleted")
-			result_list = self.run_imap_multiprocessing(func=graph_model.neo_query, argument_list=neo, num_processes=8)
+			nq = partial(neo_query, gcp=True)
+			result_list = self.run_imap_multiprocessing(func=nq, argument_list=neo, num_processes=8)
 	
 	def run_imap_multiprocessing(self, func, argument_list, num_processes):
 
@@ -191,16 +194,16 @@ class graph_model(object):
 
 		return result_list_tqdm			
 
-	@staticmethod
-	def neo_query(query_string):		
+	
+def neo_query(query_string, gcp=False):		
 
-		if graph_model().gcp:
+	if gcp:
 			
-			os.system("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string))
+		os.system("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string))
 
-		else:
+	else:
 			
-			os.system("cypher-shell -u 'neo4j' -p 'password' --format plain '{}'".format(query_string))	
+		os.system("cypher-shell -u 'neo4j' -p 'password' --format plain '{}'".format(query_string))	
 		
 
 def aggregate_features(features_dataframe, geo_shape_file, aggregate_by, **feature_function_pairs):
