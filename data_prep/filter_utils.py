@@ -24,6 +24,7 @@ def standardize_place_names(home_directory, file_name, data_directory, geo_direc
 	import utilities
 	
 	df = pd.read_csv('{}/{}'.format(data_directory, file_name))
+	print(df.shape)
 	for geo_entity in geo_types:
 		
 		if gcp:

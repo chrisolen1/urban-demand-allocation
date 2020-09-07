@@ -5,7 +5,7 @@ import os
 
 import utilities
 
-def business_filter(bus_frame, years, naics_codes):
+def business_filter(bus_frame, naics_codes):
 
 	"""
 	:bus_frame: business dataframe
@@ -15,12 +15,6 @@ def business_filter(bus_frame, years, naics_codes):
 	Returns: filtered business dataframe, potentially including sales volume for 
 	the same store for multiple years 
 	"""
-
-	assert(isinstance(years,list)), "\
-		years argument must be of type list"
-	
-	assert(all(element for element in [isinstance(i,int) for i in years])), "\
-		all years must be of type int"
 	
 	assert(isinstance(naics_codes,list)), "\
 		naics_code argument must be of type list"
@@ -28,8 +22,9 @@ def business_filter(bus_frame, years, naics_codes):
 	assert(all(element for element in [isinstance(i,str) for i in naics_codes])), "\
 		all naics_codes must be of type str"
 
+	print(naics_codes)
 	# filter for indicated years and naics_codes
-	bus = naics_year_filter(bus_frame, years, naics_codes)
+	bus = naics_filter(bus_frame, naics_codes)
 	# drop meta data and other info used for filtering
 	bus.drop(['abi','primary_naics_code','company','business_status_code','company_holding_status',
 		'year_established','employee_size_location'], axis=1, inplace=True)
@@ -37,7 +32,7 @@ def business_filter(bus_frame, years, naics_codes):
 	return bus
 		
 
-def naics_year_filter(bus_frame, years, naics_codes):
+def naics_filter(bus_frame, naics_codes):
 	
 	"""
 	:bus_frame: business dataframe
@@ -47,9 +42,7 @@ def naics_year_filter(bus_frame, years, naics_codes):
 	Returns: dataframe of business data filtered for year and naics code
 	"""
 	
-	bus_frame = bus_frame[bus_frame['primary_naics_code'].apply(parse_naics, args=[naics_codes])]
-	
-	return bus_frame[bus_frame['year'].isin(years)]
+	return bus_frame[bus_frame['primary_naics_code'].apply(parse_naics, args=[naics_codes])]
 	
 	
 def parse_naics(df_value, naics):
@@ -58,7 +51,7 @@ def parse_naics(df_value, naics):
 	filter provided dataframe for naics codes. 
 	mean to be used in df.apply() 
 	"""
-
+	
 	results = []
 	for i in naics:
 		

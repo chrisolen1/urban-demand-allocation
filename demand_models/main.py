@@ -29,7 +29,7 @@ if gcp:
 
 import utilities
 from demand_models.build_demand_model_utils import business_filter, connect_to_neo4j, graph_to_demand_model
-from data_prep.filter_utils import standard_place_names
+from data_prep.filter_utils import standardize_place_names
 
 # load in raw business data 
 #df_types = pd.read_csv('../../data/dtypes.csv')['dtypes']
@@ -43,7 +43,8 @@ while True:
 	else:
 		break
 print("loading in business data...")
-file_name = pd.read_csv("{}biz-bucket/bus_{}_{}_standardized.csv".format(data_directory, city, year))
+bus = pd.read_csv("{}biz-bucket/business_{}_{}_standardized.csv".format(data_directory, city, year))
+bus['primary_naics_code'] = bus['primary_naics_code'].apply(lambda x: str(x))
 naicses = []
 naics = input("Please choose a naics code between four and eight digits:    ")
 while True:
@@ -75,21 +76,21 @@ while True:
 			except ValueError: 
 				naics = input("Naics codes must be integer values:    ")
 print("pulling relevant demand data...")				
-demand = business_filter(bus, years, naics)
+demand = business_filter(bus, naicses)
 print("writing to storage...")
 if gcp:
-	naics_str = "".join(i + " " for i in naicses)
+	naics_str = "".join(i + "_" for i in naicses)
 	opt_bucket = storage_client.get_bucket(opt_directory)
-	bucket.blob('{}_{}/{}.csv'.format(city, year, naics_str)).upload_from_string(demand.to_csv(index=False), 'text/csv')
+	bucket.blob('{}_{}_{}/{}.csv'.format(city, year, naics_str, naics_str)).upload_from_string(demand.to_csv(index=False), 'text/csv')
 else:
-	naics_str = "".join(i + " " for i in naicses)
-	os.system("mkdir {}/{}_{}".format(opt_directory, city, year))
-	demand.to_csv("{}/{}_{}/{}.csv".format(opt_directory, city, year, naics_str))
-
-answer = input("Let's determine the predictors for our demand model. (1) Do you have an existing\
- graph model you're working off of or (2) would you like create a new graph?:   ")
+	naics_str = "".join(i + "_" for i in naicses)
+	os.system("mkdir {}/{}_{}_{}".format(opt_directory, city, year, naics_str))
+	demand.to_csv("{}/{}_{}_{}/{}.csv".format(opt_directory, city, year, naics_str, naics_str))
+full_path = "{}/{}_{}_{}".format(opt_directory, city, year, naics_str)
+answer = int(input("Let's determine the predictors for our demand model. (1) Do you have an existing\
+ graph model you're working off of or (2) would you like create a new graph?:   "))
 while True:
-	if int(answer) != 1 or int(answer) != 2:
+	if answer != 1 and answer != 2:
 		answer = input("Please answer the above with '1' or '2':   ")
 	else:
 		break
@@ -186,12 +187,26 @@ if answer == 2:
 		print("Adding graph structure to Neo4j!")
 		gm.create_neo4j_queries()
 		gm.query_neo4j()
+	geo_types = aggregate_by
 	print("Done with graph model!")
 
+elif answer == 1:
+	print("retrieving node categories from existing graph")
+	geo_types = os.system("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain 'match (n) return distinct labels(n)'")
+	demand_model_features = []
+	for geo_type in geo_types:
+		features = os.system("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain 'match (a:{}) return keys(a)'".format(geo_type)) 
+		demand_model_features += features
+		demand_model_features.remove("name")
+
+
+
+
 print("addng geo entities to demand data...")
-standardize_place_names(home_directory, naics_str, opt_directory, geo_directory, aggregate_by, city, gcp)
+file_name = naics_str + ".csv"
+standardize_place_names(home_directory, file_name, full_path, geo_directory, aggregate_by, city, gcp)
 # load geo tagged demand data 
-demand = pd.read_csv("{}/{}.csv".format(opt_directory, naics_str))
+demand = pd.read_csv("{}/{}".format(full_path, file_name))
 
 #### some line of question re edge relations for demand model 
 geo_entity = aggregate_by
