@@ -95,11 +95,11 @@ class graph_model(object):
 			if self.gcp:
 		
 				blob = self.graph_bucket.blob('{}.pkl'.format(self.graph_model_name))
-				os.system("mkdir {}/create-graph-model/temp".format(self.home_directory))
-				blob.download_to_filename("{}/create-graph-model/temp/temp.pkl".format(self.home_directory), client=None)
-				G = nx.read_gpickle("{}/create-graph-model/temp/temp.pkl".format(self.home_directory))
-				os.remove("{}/create-graph-model/temp/temp.pkl".format(self.home_directory))
-				os.system("rmdir {}/create-graph-model/temp".format(self.home_directory))
+				os.system("mkdir {}/create_graph_model/temp".format(self.home_directory))
+				blob.download_to_filename("{}/create_graph_model/temp/temp.pkl".format(self.home_directory), client=None)
+				G = nx.read_gpickle("{}/create_graph_model/temp/temp.pkl".format(self.home_directory))
+				os.remove("{}/create_graph_model/temp/temp.pkl".format(self.home_directory))
+				os.system("rmdir {}/create_graph_model/temp".format(self.home_directory))
 	
 			else:
 		
@@ -129,13 +129,13 @@ class graph_model(object):
 		# save as pkl file
 		if self.gcp:
 			# write to disk first
-			os.system("sudo mkdir {}/create-graph-model/temp".format(self.home_directory))
-			nx.write_gpickle(G, "{}/create-graph-model/temp/{}.pkl".format(self.home_directory, self.graph_model_name))
+			os.system("sudo mkdir {}/create_graph_model/temp".format(self.home_directory))
+			nx.write_gpickle(G, "{}/create_graph_model/temp/{}.pkl".format(self.home_directory, self.graph_model_name))
 			# then upload to bucket
 			blob = self.graph_bucket.blob('{}.pkl'.format(self.graph_model_name))
-			blob.upload_from_filename("{}/create-graph-model/temp/{}.pkl".format(self.home_directory, self.graph_model_name))
-			os.remove("{}/create-graph-model/temp/{}.pkl".format(self.home_directory, self.graph_model_name))
-			os.system("rmdir {}/create-graph-model/temp".format(self.home_directory))
+			blob.upload_from_filename("{}/create_graph_model/temp/{}.pkl".format(self.home_directory, self.graph_model_name))
+			os.remove("{}/create_graph_model/temp/{}.pkl".format(self.home_directory, self.graph_model_name))
+			os.system("rmdir {}/create_graph_model/temp".format(self.home_directory))
 	
 		else:
 			nx.write_gpickle(G, "{}/{}.pkl".format(self.graph_directory, self.graph_model_name))
@@ -144,10 +144,10 @@ class graph_model(object):
 
 		if self.gcp:
 			blob = self.graph_bucket.blob('{}.pkl'.format(self.graph_model_name))
-			os.system("mkdir {}/create-graph-model/temp".format(self.home_directory))
-			blob.download_to_filename("{}/create-graph-model/temp/temp.pkl".format(self.home_directory), client=None)
-			G = nx.read_gpickle("{}/create-graph-model/temp/temp.pkl".format(self.home_directory))
-			os.remove("{}/create-graph-model/temp/temp.pkl".format(self.home_directory))
+			os.system("mkdir {}/create_graph_model/temp".format(self.home_directory))
+			blob.download_to_filename("{}/create_graph_model/temp/temp.pkl".format(self.home_directory), client=None)
+			G = nx.read_gpickle("{}/create_graph_model/temp/temp.pkl".format(self.home_directory))
+			os.remove("{}/create_graph_model/temp/temp.pkl".format(self.home_directory))
 			os.system("rmdir {}/create-graph_model/temp".format(self.home_directory))
 
 		else:

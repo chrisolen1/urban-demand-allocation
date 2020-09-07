@@ -17,7 +17,7 @@ gcp = parse_results.gcp
 
 import sys
 sys.path.append(home_directory)
-imort os
+import os
 import pandas as pd
 import numpy as np
 import json

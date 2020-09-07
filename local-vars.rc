@@ -10,4 +10,6 @@ export BUS_DIR="/Users/chrisolen/Documents/projects/demand-allocation/data/biz-b
 
 export GRAPH_DIR="/Users/chrisolen/Documents/projects/demand-allocation/data/graph-models"
 
+export GRAPH_DIR="/Users/chrisolen/Documents/projects/demand-allocation/data/opt-vars"
+
 export DATA_DIR="/Users/chrisolen/Documents/projects/demand-allocation/data/"

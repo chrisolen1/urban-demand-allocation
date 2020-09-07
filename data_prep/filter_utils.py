@@ -16,7 +16,7 @@ from pyspark.sql.functions import col
 import gcsfs
 
 
-def standardize_place_names(home_directory, file_name, data_directory, geo_directory, geo_types, city, n_processes, gcp):
+def standardize_place_names(home_directory, file_name, data_directory, geo_directory, geo_types, city, gcp):
 
 	import sys
 	sys.path.append(home_directory)

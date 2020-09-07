@@ -10,4 +10,6 @@ export BUS_DIR="gs://biz-bucket"
 
 export GRAPH_DIR="gs://graph-models"
 
+export GRAPH_DIR="gs://opt-vars"
+
 export DATA_DIR="gs://"
