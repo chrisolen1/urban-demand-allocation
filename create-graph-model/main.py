@@ -75,7 +75,7 @@ while True:
 			break
 	# determine aggregate feature: aggregate_function pairs
 	while True:
-		print("{}/{}".format(data_directory_complete, file_name))
+		print("loading {}/{} ...".format(data_directory_complete, file_name))
 		df = pd.read_csv("{}/{}".format(data_directory_complete, file_name))
 		cols = df.columns
 		features = input("List the features that you would like to aggregate from the following. Add one space between each one, {}:   ".format(cols)).rstrip().split(" ")

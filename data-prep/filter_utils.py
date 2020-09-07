@@ -7,6 +7,7 @@ import json
 import multiprocessing as mp
 from tqdm import tqdm 
 from functools import partial
+import os
 
 import pyspark
 from pyspark.context import SparkContext
@@ -42,14 +43,10 @@ def standardize_place_names(home_directory, file_name, data_directory, geo_direc
 
 		print("matching samples with {}".format(geo_entity))   
 
-		if n_processes > 1:
-			lookup = partial(utilities.point_lookup, geo)
-			pool = mp.Pool(processes=n_processes)
-			chunksize = 1000
-			n = list(tqdm(pool.imap(lookup, positions, chunksize), total=len(positions)))
-
-		else:
-			n = [utilities.point_lookup(geo, positions[i]) for i in tqdm(range(len(positions)))]
+		lookup = partial(utilities.point_lookup, geo)
+		pool = mp.Pool(processes=os.cpu_count())
+		chunksize = 1000
+		n = list(tqdm(pool.imap(lookup, positions, chunksize), total=len(positions)))
 
 		df['{}'.format(geo_entity)] = np.nan
 

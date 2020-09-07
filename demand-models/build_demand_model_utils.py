@@ -1,8 +1,7 @@
-import sys
-sys.path.append('/Users/chrisolen/Documents/uchicago_courses/optimization/project/urban-demand-allocation')
-
 import pandas as pd
 import numpy as np
+
+import os
 
 import utilities
 
@@ -86,14 +85,109 @@ def connect_to_neo4j(uri, username, password):
 	graph = Graph(uri, auth=(username, password))
 	return graph
 
-def graph_to_demand_model(graph, demand_frame, feature, localities, locality_type, edge_relation=None):
+def graph_to_demand_model(demand_frame, feature, geo_directory, geo_entity, edge_relation=None):
 	
 	"""
 	:graph: neo4j object from py2neo
 	:demand_frame: pandas dataframe of features predicting demand (sales) for each relevant business
 	:feature: str, location-based feature to be added from the neo4j graph to the demand_frame (e.g. avg_property_value)
 	:localities: json of locality shape coordinates of search area 
-	:locality_type: str, locality type corresponding to the node types to which we're restricting the query (e.g. neighborhood or tract)
+	:geo_entity: str, locality type corresponding to the node types to which we're restricting the query (e.g. neighborhood or tract)
+	Returns: updated demand dataframe with new feature column
+	"""
+	
+	# pulling neighborhood polygons
+	with open('{}/{}_reformatted.json','r').format(geo_directory, geo_entity) as f:
+		localities = json.load(f)
+	# create new column for feature; rename feature if edge relationship True
+	if edge_relation:
+		modified_feature = feature + "_" + edge_relation
+		demand_frame[modified_feature] = np.nan
+	else:
+		demand_frame[feature] = np.nan
+	# and empty list for those coordinates outside of the immediate search area 
+	# (determined by the localities shapefiles)
+	outside_search_area = []
+	# iterate through lat_long pairs for each business
+	for i in range(len(demand_frame)):
+		geo_tag = demand_frame.iloc[i][geo_entity]
+		# pull out the feature associated with the locality that the business is located within
+		try:
+			if not edge_relation:
+
+				
+				result = float(dict(pd.DataFrame(os.system("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain 'match (a:{}) \
+												where a.name = {} return a".format(geo_entity,geo_tag)). \
+												to_table()).iloc[0,0])[feature])
+				## coordinates and df indices should be the same ## 
+				demand_frame[feature].iloc[i] = result
+				
+			else:
+				
+				result = pd.DataFrame(graph.run("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain match (a:{})-[:{}]->(b) \
+												where a.name = {} \
+												return b".format(geo_entity,edge_relation,geo_tag)). \
+												to_table())
+				# count number of edge relations returned
+				n_edge_relations = len(result[0])
+				edge_features = []
+				# pull out each of the feature values for each of the edge relations 
+				for j in range(n_edge_relations):
+					edge_feature = float(dict(result[0][j])[feature])
+					edge_features.append(edge_feature)
+				# average over edge relation feature values, ignoring any NaNs
+				mean_of_edge_features = np.nanmean(edge_features)
+		
+				## coordinates and df indices should be the same ## 
+				demand[modified_feature].iloc[i] = mean_of_edge_features
+		
+		# it may be that the coordinates don't match any of the localities associated with the search area
+		except:
+			outside_search_area.append((i, business_coordinates[i]))
+	 
+	# for the coordinates that lie (usually barely) outside the search area 
+	for i in range(len(outside_search_area)): 
+	
+		point_location = utilities.closest_to(localities,outside_search_area[i][1])
+	
+		if not edge_relation:
+				
+			result = float(dict(pd.DataFrame(graph.run("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain 'match (a:{}) \
+												where a.name = {} return a".format(geo_entity,point_location)). \
+											to_table()).iloc[0,0])[feature])
+
+			## coordinates and df indices should be the same ## 
+			demand_frame[feature].iloc[outside_search_area[i][0]] = result
+				
+		else:
+				
+			result = pd.DataFrame(graph.run("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain match (a:{})-[:{}]->(b) \
+												where a.name = {} \
+												return b".format(geo_entity,edge_relation,point_location)). \
+											to_table())
+			# count number of edge relations returned
+			n_edge_relations = len(result[0])
+			edge_features = []
+			# pull out each of the feature values for each of the edge relations 
+			for j in range(n_edge_relations):
+				edge_feature = float(dict(result[0][j])[feature])
+				edge_features.append(edge_feature)
+			# average over edge relation feature values, ignoring any NaNs
+			mean_of_edge_features = np.nanmean(edge_features)
+		
+			## coordinates and df indices should be the same ## 
+			demand_frame[modified_feature].iloc[outside_search_area[i][0]] = mean_of_edge_features
+		
+	return demand_frame	
+	
+def _local_graph_to_demand_model(graph, demand_frame, feature, localities, geo_entity, edge_relation=None):
+	
+	"""
+	:graph: neo4j object from py2neo
+	:demand_frame: pandas dataframe of features predicting demand (sales) for each relevant business
+	:feature: str, location-based feature to be added from the neo4j graph to the demand_frame (e.g. avg_property_value)
+	:localities: json of locality shape coordinates of search area 
+	:geo_entity: str, locality type corresponding to the node types to which we're restricting the query (e.g. neighborhood or tract)
 	Returns: updated demand dataframe with new feature column
 	"""
 	
@@ -119,7 +213,7 @@ def graph_to_demand_model(graph, demand_frame, feature, localities, locality_typ
 
 				
 				result = float(dict(pd.DataFrame(graph.run('match (a:{}) \
-												where a.name = "{}" return a'.format(locality_type,point_location)). \
+												where a.name = "{}" return a'.format(geo_entity,point_location)). \
 												to_table()).iloc[0,0])[feature])
 				## coordinates and df indices should be the same ## 
 				demand_frame[feature].iloc[i] = result
@@ -128,7 +222,7 @@ def graph_to_demand_model(graph, demand_frame, feature, localities, locality_typ
 				
 				result = pd.DataFrame(graph.run('match (a:{})-[:{}]->(b) \
 												where a.name = "{}" \
-												return b'.format(locality_type,edge_relation,point_location)). \
+												return b'.format(geo_entity,edge_relation,point_location)). \
 												to_table())
 				# count number of edge relations returned
 				n_edge_relations = len(result[0])
@@ -155,7 +249,7 @@ def graph_to_demand_model(graph, demand_frame, feature, localities, locality_typ
 		if not edge_relation:
 				
 			result = float(dict(pd.DataFrame(graph.run('match (a:{}) \
-											where a.name = "{}" return a'.format(locality_type,point_location)). \
+											where a.name = "{}" return a'.format(geo_entity,point_location)). \
 											to_table()).iloc[0,0])[feature])
 
 			## coordinates and df indices should be the same ## 
@@ -165,7 +259,7 @@ def graph_to_demand_model(graph, demand_frame, feature, localities, locality_typ
 				
 			result = pd.DataFrame(graph.run('match (a:{})-[:{}]->(b) \
 											where a.name = "{}" \
-											return b'.format(locality_type,edge_relation,point_location)). \
+											return b'.format(geo_entity,edge_relation,point_location)). \
 											to_table())
 			# count number of edge relations returned
 			n_edge_relations = len(result[0])
@@ -182,4 +276,5 @@ def graph_to_demand_model(graph, demand_frame, feature, localities, locality_typ
 		
 	return demand_frame	
 	
+
 	
