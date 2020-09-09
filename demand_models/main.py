@@ -87,7 +87,7 @@ if gcp:
 else:
 	naics_str = "".join(i + "_" for i in naicses)
 	os.system("mkdir {}/{}_{}_{}".format(opt_directory, city, year, naics_str))
-	demand.to_csv("{}/{}_{}_{}/{}.csv".format(opt_directory, city, year, naics_str, naics_str))
+	demand.to_csv("{}/{}_{}_{}/{}.csv".format(opt_directory, city, year, naics_str, naics_str), index=False)
 full_path = "{}/{}_{}_{}".format(opt_directory, city, year, naics_str)
 answer = int(input("Let's determine the predictors for our demand model. (1) Do you have an existing\
  graph model you're working off of or (2) would you like create a new graph?:   "))

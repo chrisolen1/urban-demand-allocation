@@ -438,7 +438,7 @@ def pynx_to_neo4j_queries(graph, return_nodes=True, return_edges=True):
 		n_attributes = len(list(i[1].values())) 
 
 		root_info = "CREATE " + "(" + "%s" + ":" + "%s" + " {" + "%s" + ":" + '"' + "%s" + '"'
-		root_info = root_info % (re.sub(r'\W+','', i[0]), i[1]['node_category'], list(i[1].keys())[0], list(i[1].values())[0].replace("'",""))
+		root_info = root_info % (re.sub(r'\W+','', i[0]), i[1]['node_category'], list(i[1].keys())[0], list(i[1].values())[0].replace("'","").replace(",",""))
 
 		end_string = "}" + ")"
 
@@ -456,7 +456,7 @@ def pynx_to_neo4j_queries(graph, return_nodes=True, return_edges=True):
 	print("creating edge queries")
 	
 	neo_edges = ['MATCH (a) WHERE a.name = "{}" MATCH (b) WHERE b.name = "{}" '\
-	.format(i[0].replace("'",""), i[1].replace("'","")) + \
+	.format(i[0].replace("'","").replace(",",""), i[1].replace("'","").replace(",","")) + \
 	"CREATE " + "(a)" + "-[:" + list(i[2].keys())[0] + " " + \
 	str(list(i[2].values())[0]) + "]" + "->" + "(b)" for i in tqdm(nx_edges)]
 	

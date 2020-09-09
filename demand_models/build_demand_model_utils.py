@@ -4,6 +4,8 @@ import json
 
 import os
 import subprocess
+import multiprocessing as mp
+from functools import partial
 
 import re
 
@@ -28,7 +30,7 @@ def business_filter(bus_frame, naics_codes):
 	assert(all(element for element in [isinstance(i,str) for i in naics_codes])), "\
 		all naics_codes must be of type str"
 
-	print(naics_codes)
+	
 	# filter for indicated years and naics_codes
 	bus = naics_filter(bus_frame, naics_codes)
 	# drop meta data and other info used for filtering
@@ -99,7 +101,7 @@ def graph_to_demand_model(demand_frame, features, geo_directory, geo_entity, cit
 	with open('{}/{}_{}_reformatted.json'.format(geo_directory, city, geo_entity),'r') as f:
 		localities = json.load(f)
 	# create new column for feature; rename feature if edge relationship True
-	print(features)
+	
 	if not edge_relation:
 		for feature in features:
 			demand_frame[feature] = np.nan
@@ -108,87 +110,109 @@ def graph_to_demand_model(demand_frame, features, geo_directory, geo_entity, cit
 			demand_frame[feature] = np.nan
 			modified_feature = feature + "_" + edge_relation
 			demand_frame[modified_feature] = np.nan
-	print(demand_frame.columns)		
+	
 	# and empty list for those coordinates outside of the immediate search area 
 	# (determined by the localities shapefiles)
-	outside_search_area = []
+	#outside_search_area = []
 	# iterate through lat_long pairs for each business
 	print("populating demand predictors")
-	for i in tqdm(range(len(demand_frame))):
-		geo_tag = demand_frame.iloc[i][geo_entity]
+	#for i in tqdm(range(len(demand_frame))):
+	#	geo_tag = demand_frame.iloc[i][geo_entity]
+	inside_search_area = demand_frame[demand_frame[geo_entity] != "None"]
+	outside_search_area = demand_frame[demand_frame[geo_entity] == "None"]
 		# pull out the feature associated with the locality that the business is located within
-		if geo_tag != None:
-			if not edge_relation:
+	#	if geo_tag != None:
+	chunksize=30
+	if not edge_relation:
 
-				query_string = 'match (a:{}) where a.name = "{}" return a'.format(geo_entity,geo_tag)
-				result = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
-					-- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string), shell=True))
-				result = re.findall("(\{[\W\w]+\})",result)[0].replace("{","").replace("}","").split(",")
-				result = [j.replace(" ","").split(":") for j in result]
-				for k in result:
-					if [k][0] != 'name':
-						demand_frame[k[0]].iloc[i] = k[1]
+		geo_tags = inside_search_area[geo_entity].unique()		
+		nq = partial(neo_query, geo_entity=geo_entity, edge_relation=None)
+		chunksize = 1
+		run_imap_multiprocessing(func=nq, argument_list=geo_tags, num_processes=os.cpu_count(), chunksize=chunksize)
+
+	else:
 				
-			else:
-				
-				query_string = 'match (a:{})-[:{}]->(b) where a.name = "{}"" return b'.format(geo_entity,edge_relation,geo_tag)
-				result = pd.DataFrame(str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
-					-- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string), shell=True)). \
-												to_table())
-				# count number of edge relations returned
-				n_edge_relations = len(result[0])
-				edge_features = []
-				# pull out each of the feature values for each of the edge relations 
-				for j in range(n_edge_relations):
-					edge_feature = float(dict(result[0][j])[feature])
-					edge_features.append(edge_feature)
-				# average over edge relation feature values, ignoring any NaNs
-				mean_of_edge_features = np.nanmean(edge_features)
-		
-				## coordinates and df indices should be the same ## 
-				demand[modified_feature].iloc[i] = mean_of_edge_features
-		
+		geo_tags = inside_search_area[geo_entity]						
+		nq = partial(neo_query, geo_entity=geo_entity, edge_relation=edge_relation)
+		run_imap_multiprocessing(func=nq, argument_list=geo_tags, num_processes=os.cpu_count(), chunksize=chunksize)
+
 		# it may be that the coordinates don't match any of the localities associated with the search area
-		else:
-			outside_search_area.append((i, (demand_frame.iloc[i]['latitude'],demand_frame.iloc[i]['longitude'])))
+		#else:
+		#	outside_search_area.append((i, (demand_frame.iloc[i]['latitude'],demand_frame.iloc[i]['longitude'])))
 	 
 	# for the coordinates that lie (usually barely) outside the search area 
+	"""
 	print("a few of the businesses fall a bit outside {}".format(city))
 	for i in tqdm(range(len(outside_search_area))): 
 	
-		point_location = utilities.closest_to(localities,outside_search_area[i][1])
+		geo_tag = utilities.closest_to(localities,outside_search_area[i][1])
 	
 		if not edge_relation:
 			
 			query_string = 'match (a:{}) where a.name = "{}" return a'.format(geo_entity,geo_tag)				
-			result = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
-					-- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string), shell=True))
-			result = re.findall("(\{[\W\w]+\})",result)[0].replace("{","").replace("}","").split(",").replace(" ","")
-			result = [j.split(":") for j in result]
-			for k in result:
-				if [k][0] != 'name':
-					demand_frame[k[0]].iloc[i] = k[1]
+			nq = partial(neo_query, demand_frame=demand_frame, edge_relation=None)
 				
 		else:
 			
 			query_string = 'match (a:{})-[:{}]->(b) where a.name = "{}"" return b'.format(geo_entity,edge_relation,geo_tag)				
-			result = pd.DataFrame(str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
+			nq = partial(neo_query, demand_frame=demand_frame, edge_relation=edge_relation)
+	"""	
+	return demand_frame	
+
+def run_imap_multiprocessing(func, argument_list, num_processes, chunksize=10):
+
+		
+		pool = mp.Pool(processes=num_processes)
+		result_list = []
+		for result in tqdm(pool.imap(func=func, iterable=argument_list, chunksize=chunksize), total=len(argument_list)):
+			
+			result_list.append(result)
+
+		print(result_list)
+		return result_list
+
+def neo_query(geo_tag, geo_entity, edge_relation=None):		
+
+	if not edge_relation:
+		
+		query_string = 'match (a:{}) where a.name = "{}" return a'.format(geo_entity,geo_tag.replace("'","").replace(",",""))	
+		print("query_string",query_string)
+		output = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
+					-- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string), shell=True))
+		print("output",output)
+		try:
+			output = re.findall("(\{[\W\w]+\})",output)[0].replace("{","").replace("}","").split(",")		
+			output = [j.rstrip().lstrip().split(":") for j in output]
+		
+			results = []
+		
+			for k in output:
+				if [k][0] != 'name':
+					results.append(k[1])
+		except:
+			results = ("fuckkkkkkkkkkkk", geo_tag)
+		
+		return results
+
+	else:
+		
+		query_string = 'match (a:{})-[:{}]->(b) where a.name = "{}"" return b'.format(geo_entity,edge_relation,geo_tag.replace("'","").replace(",",""))			
+		print(query_string)
+		output = pd.DataFrame(str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
 					-- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string), shell=True)). \
 											to_table())
-			# count number of edge relations returned
-			n_edge_relations = len(result[0])
-			edge_features = []
-			# pull out each of the feature values for each of the edge relations 
-			for j in range(n_edge_relations):
-				edge_feature = float(dict(result[0][j])[feature])
-				edge_features.append(edge_feature)
-			# average over edge relation feature values, ignoring any NaNs
-			mean_of_edge_features = np.nanmean(edge_features)
+		# count number of edge relations returned
+		n_edge_relations = len(output[0])
+		edge_features = []
+		# pull out each of the feature values for each of the edge relations 
+		for j in range(n_edge_relations):
+			edge_feature = float(dict(result[0][j])[feature])
+			edge_features.append(edge_feature)
+		# average over edge relation feature values, ignoring any NaNs
+		mean_of_edge_features = np.nanmean(edge_features)
 		
-			## coordinates and df indices should be the same ## 
-			demand_frame[modified_feature].iloc[outside_search_area[i][0]] = mean_of_edge_features
-		
-	return demand_frame	
+		## coordinates and df indices should be the same ## 
+		demand_frame[modified_feature].iloc[outside_search_area[i][0]] = mean_of_edge_features
 	
 def _local_graph_to_demand_model(graph, demand_frame, feature, localities, geo_entity, edge_relation=None):
 	
