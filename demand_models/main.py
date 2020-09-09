@@ -18,6 +18,8 @@ gcp = parse_results.gcp
 import sys
 sys.path.append(home_directory)
 import os
+import subprocess
+import re
 import pandas as pd
 import numpy as np
 import json
@@ -192,26 +194,26 @@ if answer == 2:
 
 elif answer == 1:
 	print("retrieving node categories from existing graph")
-	geo_types = os.system("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain 'match (n) return distinct labels(n)'")
-	demand_model_features = []
+	geo_types = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 -- cypher-shell \
+		-u 'neo4j' -p 'asdf' -d 'neo4j' --format plain 'match (n) return distinct labels(n)'", shell=True))
+	geo_types = re.findall("(\[[\W\w]+\])",geo_types)[0].replace("]","").replace("[","").replace('"',"").split(",")
+	print("retrieving attribute features from existing graph")
 	for geo_type in geo_types:
-		features = os.system("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain 'match (a:{}) return keys(a)'".format(geo_type)) 
-		demand_model_features += features
-		demand_model_features.remove("name")
-
-
-
+		features = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 -- cypher-shell \
+			-u 'neo4j' -p 'asdf' -d 'neo4j' --format plain 'match (a:{}) return keys(a)'".format(geo_type), shell=True))
+		features = re.findall("(\[[\W\w]+\])",features)[0].replace("]","").replace("[","").replace('"',"").split("\\r\\n")[0].split(",")
+		features = [i.replace(" ","") for i in features]
+		
 
 print("addng geo entities to demand data...")
 file_name = naics_str + ".csv"
-standardize_place_names(home_directory, file_name, full_path, geo_directory, aggregate_by, city, gcp)
+standardize_place_names(home_directory, file_name, full_path, geo_directory, geo_types, city, gcp)
 # load geo tagged demand data 
 demand = pd.read_csv("{}/{}".format(full_path, file_name))
 
 #### some line of question re edge relations for demand model 
-geo_entity = aggregate_by
-for feature in demand_model_features:
-	demand = graph_to_demand_model(demand, feature, geo_directory, geo_entity)
+geo_entity = geo_types[0]
+demand = graph_to_demand_model(demand, features, geo_directory, geo_entity, city)
 
 
 """
@@ -219,8 +221,6 @@ demand = graph_to_demand_model(demand, "primary_type", neighborhoods, "neighborh
 demand = graph_to_demand_model(demand, "zestimate", neighborhoods, "neighborhood", edge_relation="NEXT_TO")
 demand = graph_to_demand_model(demand, "primary_type", neighborhoods, "neighborhood", edge_relation="NEXT_TO")
 """
-
-
 
 # remove any null values
 demand.dropna(inplace=True)

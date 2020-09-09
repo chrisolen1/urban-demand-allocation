@@ -1,7 +1,13 @@
 import pandas as pd
 import numpy as np
+import json
 
 import os
+import subprocess
+
+import re
+
+from tqdm import tqdm
 
 import utilities
 
@@ -51,7 +57,7 @@ def parse_naics(df_value, naics):
 	filter provided dataframe for naics codes. 
 	mean to be used in df.apply() 
 	"""
-	
+
 	results = []
 	for i in naics:
 		
@@ -78,7 +84,7 @@ def connect_to_neo4j(uri, username, password):
 	graph = Graph(uri, auth=(username, password))
 	return graph
 
-def graph_to_demand_model(demand_frame, feature, geo_directory, geo_entity, edge_relation=None):
+def graph_to_demand_model(demand_frame, features, geo_directory, geo_entity, city, edge_relation=None):
 	
 	"""
 	:graph: neo4j object from py2neo
@@ -90,36 +96,44 @@ def graph_to_demand_model(demand_frame, feature, geo_directory, geo_entity, edge
 	"""
 	
 	# pulling neighborhood polygons
-	with open('{}/{}_reformatted.json','r').format(geo_directory, geo_entity) as f:
+	with open('{}/{}_{}_reformatted.json'.format(geo_directory, city, geo_entity),'r') as f:
 		localities = json.load(f)
 	# create new column for feature; rename feature if edge relationship True
-	if edge_relation:
-		modified_feature = feature + "_" + edge_relation
-		demand_frame[modified_feature] = np.nan
+	print(features)
+	if not edge_relation:
+		for feature in features:
+			demand_frame[feature] = np.nan
 	else:
-		demand_frame[feature] = np.nan
+		for feature in features:
+			demand_frame[feature] = np.nan
+			modified_feature = feature + "_" + edge_relation
+			demand_frame[modified_feature] = np.nan
+	print(demand_frame.columns)		
 	# and empty list for those coordinates outside of the immediate search area 
 	# (determined by the localities shapefiles)
 	outside_search_area = []
 	# iterate through lat_long pairs for each business
-	for i in range(len(demand_frame)):
+	print("populating demand predictors")
+	for i in tqdm(range(len(demand_frame))):
 		geo_tag = demand_frame.iloc[i][geo_entity]
 		# pull out the feature associated with the locality that the business is located within
-		try:
+		if geo_tag != None:
 			if not edge_relation:
 
-				
-				result = float(dict(pd.DataFrame(os.system("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain 'match (a:{}) \
-												where a.name = {} return a".format(geo_entity,geo_tag)). \
-												to_table()).iloc[0,0])[feature])
-				## coordinates and df indices should be the same ## 
-				demand_frame[feature].iloc[i] = result
+				query_string = 'match (a:{}) where a.name = "{}" return a'.format(geo_entity,geo_tag)
+				result = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
+					-- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string), shell=True))
+				result = re.findall("(\{[\W\w]+\})",result)[0].replace("{","").replace("}","").split(",")
+				result = [j.replace(" ","").split(":") for j in result]
+				for k in result:
+					if [k][0] != 'name':
+						demand_frame[k[0]].iloc[i] = k[1]
 				
 			else:
 				
-				result = pd.DataFrame(graph.run("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain match (a:{})-[:{}]->(b) \
-												where a.name = {} \
-												return b".format(geo_entity,edge_relation,geo_tag)). \
+				query_string = 'match (a:{})-[:{}]->(b) where a.name = "{}"" return b'.format(geo_entity,edge_relation,geo_tag)
+				result = pd.DataFrame(str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
+					-- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string), shell=True)). \
 												to_table())
 				# count number of edge relations returned
 				n_edge_relations = len(result[0])
@@ -135,28 +149,31 @@ def graph_to_demand_model(demand_frame, feature, geo_directory, geo_entity, edge
 				demand[modified_feature].iloc[i] = mean_of_edge_features
 		
 		# it may be that the coordinates don't match any of the localities associated with the search area
-		except:
-			outside_search_area.append((i, business_coordinates[i]))
+		else:
+			outside_search_area.append((i, (demand_frame.iloc[i]['latitude'],demand_frame.iloc[i]['longitude'])))
 	 
 	# for the coordinates that lie (usually barely) outside the search area 
-	for i in range(len(outside_search_area)): 
+	print("a few of the businesses fall a bit outside {}".format(city))
+	for i in tqdm(range(len(outside_search_area))): 
 	
 		point_location = utilities.closest_to(localities,outside_search_area[i][1])
 	
 		if not edge_relation:
-				
-			result = float(dict(pd.DataFrame(graph.run("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain 'match (a:{}) \
-												where a.name = {} return a".format(geo_entity,point_location)). \
-											to_table()).iloc[0,0])[feature])
-
-			## coordinates and df indices should be the same ## 
-			demand_frame[feature].iloc[outside_search_area[i][0]] = result
+			
+			query_string = 'match (a:{}) where a.name = "{}" return a'.format(geo_entity,geo_tag)				
+			result = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
+					-- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string), shell=True))
+			result = re.findall("(\{[\W\w]+\})",result)[0].replace("{","").replace("}","").split(",").replace(" ","")
+			result = [j.split(":") for j in result]
+			for k in result:
+				if [k][0] != 'name':
+					demand_frame[k[0]].iloc[i] = k[1]
 				
 		else:
-				
-			result = pd.DataFrame(graph.run("kubectl exec -it neo4j-ce-1-0 -- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain match (a:{})-[:{}]->(b) \
-												where a.name = {} \
-												return b".format(geo_entity,edge_relation,point_location)). \
+			
+			query_string = 'match (a:{})-[:{}]->(b) where a.name = "{}"" return b'.format(geo_entity,edge_relation,geo_tag)				
+			result = pd.DataFrame(str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
+					-- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string), shell=True)). \
 											to_table())
 			# count number of edge relations returned
 			n_edge_relations = len(result[0])
