@@ -97,9 +97,7 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, edge_re
 	Returns: updated demand dataframe with new feature column
 	"""
 	
-	# pulling neighborhood polygons
-	with open('{}/{}_{}_reformatted.json'.format(geo_directory, city, geo_entity),'r') as f:
-		localities = json.load(f)
+	
 	# create new column for feature; rename feature if edge relationship True
 	modified_features = []
 	if edge_relation:
@@ -135,7 +133,7 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, edge_re
 		features[0] = geo_entity
 		geo_tag_df = pd.DataFrame(results_list, columns = features)
 		
-		demand_frame = demand_frame.merge(geo_tag_df, how="left", on=geo_entity)
+		inside_search_area = inside_search_area.merge(geo_tag_df, how="left", on=geo_entity)
 
 	else:
 				
@@ -157,31 +155,40 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, edge_re
 			modified_feature.append(features[i] + "_" + edge_relation)
 		features += modified_features	
 
-		geo_tag_df = pd.DataFrame(results_list, columns = modified_features)
+		geo_tag_df = pd.DataFrame(results_list, columns = features)
 
-		demand_frame = demand_frame.merge(geo_tag_df, how="left", on=geo_entity)
+		inside_search_area = inside_search_area.merge(geo_tag_df, how="left", on=geo_entity)
 
-		# it may be that the coordinates don't match any of the localities associated with the search area
-		#else:
-		#	outside_search_area.append((i, (demand_frame.iloc[i]['latitude'],demand_frame.iloc[i]['longitude'])))
-	 
-	# for the coordinates that lie (usually barely) outside the search area 
-	"""
-	print("a few of the businesses fall a bit outside {}".format(city))
-	for i in tqdm(range(len(outside_search_area))): 
-	
-		geo_tag = utilities.closest_to(localities,outside_search_area[i][1])
-	
+	if outside_search_area:
+		print("a few of the business fall a bit outside {}. associating them with their closest {}...".format(city,geo_entity))
+		# pulling neighborhood polygons
+		with open('{}/{}_{}_reformatted.json'.format(geo_directory, city, geo_entity),'r') as f:
+			localities = json.load(f)
+
+		for i in range(1,len(features)):
+			outside_search_area[features[i]] = np.nan
+
+
 		if not edge_relation:
 			
-			query_string = 'match (a:{}) where a.name = "{}" return a'.format(geo_entity,geo_tag)				
-			nq = partial(neo_query, demand_frame=demand_frame, edge_relation=None)
-				
+			for i in tqdm(range(len(outside_search_area))): 
+	
+				geo_tag = utilities.closest_to(localities,outside_search_area.iloc[i][['latitude','longitude']])
+				result = neo_query(geo_tag, geo_entity, edge_relation=None)
+				for j in range(len(features)):
+					outside_search_area.iloc[i][features[j]] = result[j]
+
 		else:
-			
-			query_string = 'match (a:{})-[:{}]->(b) where a.name = "{}"" return b'.format(geo_entity,edge_relation,geo_tag)				
-			nq = partial(neo_query, demand_frame=demand_frame, edge_relation=edge_relation)
-	"""	
+
+			for i in tqdm(range(len(outside_search_area))): 
+
+				geo_tag = utilities.closest_to(localities,outside_search_area.iloc[i][['latitude','longitude']])
+				result = neo_query(geo_tag, geo_entity, edge_relation=edge_relation)
+				for j in range(len(features)):
+					outside_search_area.iloc[i][features[j]] = result[j]
+
+	pieces = (inside_search_area)
+	demand_frame = pd.concat(pieces, ignore_index=True)
 
 	return demand_frame	
 
