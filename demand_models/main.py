@@ -221,7 +221,7 @@ while True:
 		break
 
 for entity in geo_entity:
-	demand = graph_to_demand_model(demand, geo_directory, entity, city, edge_relation)
+	demand = graph_to_demand_model(demand, geo_directory, entity, city, geo_directory, gcp, edge_relation)
 
 # remove any null values
 demand.dropna(inplace=True)

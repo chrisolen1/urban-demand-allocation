@@ -72,7 +72,7 @@ def parse_naics(df_value, naics):
 			
 	return any(results)
 
-def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, edge_relation=None):
+def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, opt_directory, gcp, edge_relation=None):
 	
 	"""
 	:graph: neo4j object from py2neo
@@ -135,8 +135,17 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, edge_re
 	if outside_search_area.shape[0] != 0:
 		print("a few of the business fall a bit outside {}. associating them with their closest {}...".format(city,geo_entity))
 		# pulling neighborhood polygons
-		with open('{}/{}_{}_reformatted.json'.format(geo_directory, city, geo_entity),'r') as f:
-			localities = json.load(f)
+		if gcp:
+			import gcsfs
+			from google.cloud import storage
+			storage_client = storage.Client()
+			geo_bucket = storage_client.get_bucket(geo_directory[5:])
+			blob = geo_bucket.blob('{}_{}_reformatted.json'.format(city, geo_entity))
+			localities = json.loads(blob.download_as_string(client=None))
+
+		else:
+			with open('{}/{}_{}_reformatted.json'.format(geo_directory, city, geo_entity),'r') as f:
+				localities = json.load(f)
 
 		for i in range(1,len(features)):
 			outside_search_area[features[i]] = np.nan
