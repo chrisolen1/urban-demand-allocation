@@ -204,7 +204,7 @@ elif answer == 1:
 		features = re.findall("(\[[\W\w]+\])",features)[0].replace("]","").replace("[","").replace('"',"").split("\\r\\n")[0].split(",")
 		features = [i.replace(" ","") for i in features]
 		
-
+print("features",features)
 print("addng geo entities to demand data...")
 file_name = naics_str + ".csv"
 standardize_place_names(home_directory, file_name, full_path, geo_directory, geo_types, city, gcp)
@@ -213,7 +213,7 @@ demand = pd.read_csv("{}/{}".format(full_path, file_name))
 
 #### some line of question re edge relations for demand model 
 geo_entity = geo_types[0]
-demand = graph_to_demand_model(demand, features, geo_directory, geo_entity, city)
+demand = graph_to_demand_model(demand, geo_directory, geo_entity, city)
 
 
 """
@@ -224,6 +224,5 @@ demand = graph_to_demand_model(demand, "primary_type", neighborhoods, "neighborh
 
 # remove any null values
 demand.dropna(inplace=True)
-
-demand.to_csv("../../data/demand_model.csv", index=False)
+demand.to_csv("{}/{}_{}_{}/demand_model.csv".format(opt_directory, city, year, naics_str), index=False)
 
