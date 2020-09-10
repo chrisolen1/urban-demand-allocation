@@ -72,20 +72,6 @@ def parse_naics(df_value, naics):
 			
 	return any(results)
 
-def connect_to_neo4j(uri, username, password):
-
-	"""
-	establish connection to neo4j
-	:uri: uri and port neo4j server is listening on 
-	:username: username for neo4j server
-	:password: password for neo4j server
-	Return: neo4j instance
-	"""
-
-	from py2neo import Graph
-	graph = Graph(uri, auth=(username, password))
-	return graph
-
 def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, edge_relation=None):
 	
 	"""
@@ -146,7 +132,7 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, edge_re
 
 		inside_search_area = inside_search_area.merge(geo_tag_df, how="left", on=geo_entity)
 
-	if outside_search_area.shape[0] == 0:
+	if outside_search_area.shape[0] != 0:
 		print("a few of the business fall a bit outside {}. associating them with their closest {}...".format(city,geo_entity))
 		# pulling neighborhood polygons
 		with open('{}/{}_{}_reformatted.json'.format(geo_directory, city, geo_entity),'r') as f:
@@ -160,7 +146,7 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, edge_re
 			
 			for i in tqdm(range(len(outside_search_area))): 
 	
-				geo_tag = utilities.closest_to(localities,outside_search_area.iloc[i][['latitude','longitude']])
+				geo_tag = utilities.closest_to(localities,tuple(outside_search_area.iloc[i][['latitude','longitude']]))
 				result = neo_query(geo_tag, geo_entity, edge_relation=None)
 				for j in range(len(features)):
 					outside_search_area.iloc[i][features[j]] = result[j]
@@ -173,7 +159,7 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, edge_re
 
 			for i in tqdm(range(len(outside_search_area))): 
 
-				geo_tag = utilities.closest_to(localities,outside_search_area.iloc[i][['latitude','longitude']])
+				geo_tag = utilities.closest_to(localities,tuple(outside_search_area.iloc[i][['latitude','longitude']]))
 				result = neo_query(geo_tag, geo_entity, edge_relation=edge_relation)
 				for j in range(len(features)):
 					outside_search_area.iloc[i][features[j]] = result[j]
@@ -209,15 +195,11 @@ def neo_query(geo_tag, geo_entity, edge_relation=None):
 	for k in output:
 		results.append(k[1].rstrip().lstrip())
 		
-
 	if edge_relation:
 		
 		query_string = 'match (a:{})-[:{}]->(b) where a.name = "{}" return b'.format(geo_entity,edge_relation,geo_tag.replace("'","").replace(",",""))			
-		print("QUERY_STRING",query_string)
 		output = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
 					-- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string), shell=True))
-		print("output type:", type(output))
-		print("FIRST OUTPUT",output)
 		output = re.findall("{[\w\W]+?}",output)
 		outputs = []
 		for i in output:
@@ -227,13 +209,24 @@ def neo_query(geo_tag, geo_entity, edge_relation=None):
 		outputs = [[j.rstrip().lstrip().split(":") for j in sublist] for sublist in outputs]
 		outputs = [[float([j][0][1].lstrip().rstrip()) for j in i] for i in outputs]
 		outputs = [np.nanmean(np.array(i)) for i in outputs]
-		print("OUTPUTS:", outputs)
 		results += outputs
-
-		print("RESULTS:",results)
 
 	return results
 	
+def connect_to_neo4j(uri, username, password):
+
+	"""
+	establish connection to neo4j
+	:uri: uri and port neo4j server is listening on 
+	:username: username for neo4j server
+	:password: password for neo4j server
+	Return: neo4j instance
+	"""
+
+	from py2neo import Graph
+	graph = Graph(uri, auth=(username, password))
+	return graph
+
 def _local_graph_to_demand_model(graph, demand_frame, feature, localities, geo_entity, edge_relation=None):
 	
 	"""

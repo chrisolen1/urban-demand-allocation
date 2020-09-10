@@ -98,7 +98,7 @@ while True:
 	else:
 		break
 if answer == 2:
-	from graph_utils import graph_model
+	from create_graph_model.graph_utils import graph_model
 	graph_model_name = input("Provide the title of your graph: ")
 	gm = graph_model(home_directory=home_directory,
 			geo_directory=geo_directory,
