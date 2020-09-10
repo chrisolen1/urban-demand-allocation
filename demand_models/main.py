@@ -83,7 +83,7 @@ demand = business_filter(bus, naicses)
 print("writing to storage...")
 if gcp:
 	naics_str = "".join(i + "_" for i in naicses)
-	opt_bucket = storage_client.get_bucket(opt_directory)
+	opt_bucket = storage_client.get_bucket(opt_directory[5:])
 	bucket.blob('{}_{}_{}/{}.csv'.format(city, year, naics_str, naics_str)).upload_from_string(demand.to_csv(index=False), 'text/csv')
 else:
 	naics_str = "".join(i + "_" for i in naicses)
