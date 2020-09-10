@@ -174,7 +174,7 @@ if answer == 2:
 		gm.create_structure(aggregate_by=aggregate_by, 
 				data_directory=data_directory_complete, 
 				file_name=file_name, **feature_function_pairs)
-		geo_entity += aggregate_by
+		geo_entity += [aggregate_by]
 		result = input("Graph structure created and saved as {}.pkl. Would you like to add to it by\
 	 	choosing another combination of data type, data file, geographic aggregator, and features?\
 	 	Answer 'yes' or 'no'   ".format(graph_model_name))
@@ -204,10 +204,8 @@ elif answer == 1:
 		features = re.findall("(\[[\W\w]+\])",features)[0].replace("]","").replace("[","").replace('"',"").split("\\r\\n")[0].split(",")
 		features = [i.replace(" ","") for i in features]
 		
-print("features",features)
 print("addng geo entities to demand data...")
 file_name = naics_str + ".csv"
-print('geo_entity',geo_entity)
 standardize_place_names(home_directory, file_name, full_path, geo_directory, geo_entity, city, gcp)
 # load geo tagged demand data 
 demand = pd.read_csv("{}/{}".format(full_path, file_name))
