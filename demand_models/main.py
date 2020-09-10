@@ -209,6 +209,7 @@ file_name = naics_str + ".csv"
 standardize_place_names(home_directory, file_name, full_path, geo_directory, geo_entity, city, gcp)
 # load geo tagged demand data 
 demand = pd.read_csv("{}/{}".format(full_path, file_name))
+os.system("stty sane")
 edge_relation = input("please select from the following options for edge relations: 'NEXT_TO', 'None':   ")
 while True:
 	if edge_relation != 'NEXT_TO' and edge_relation != 'None':
