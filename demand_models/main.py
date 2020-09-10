@@ -207,6 +207,7 @@ elif answer == 1:
 print("features",features)
 print("addng geo entities to demand data...")
 file_name = naics_str + ".csv"
+print('geo_entity',geo_entity)
 standardize_place_names(home_directory, file_name, full_path, geo_directory, geo_entity, city, gcp)
 # load geo tagged demand data 
 demand = pd.read_csv("{}/{}".format(full_path, file_name))
