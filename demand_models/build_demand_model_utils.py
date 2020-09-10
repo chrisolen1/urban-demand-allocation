@@ -98,30 +98,17 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, edge_re
 	"""
 	
 	
-	# create new column for feature; rename feature if edge relationship True
-	modified_features = []
-	if edge_relation:
-		for feature in features:
-			modified_feature = feature + "_" + edge_relation
-			modified_features.append(modified_feature)
-	
-	# and empty list for those coordinates outside of the immediate search area 
-	# (determined by the localities shapefiles)
-	#outside_search_area = []
-	# iterate through lat_long pairs for each business
 	print("populating demand predictors")
-	#for i in tqdm(range(len(demand_frame))):
-	#	geo_tag = demand_frame.iloc[i][geo_entity]
+	
 	inside_search_area = demand_frame[demand_frame[geo_entity] != "None"]
 	outside_search_area = demand_frame[demand_frame[geo_entity] == "None"]
-		# pull out the feature associated with the locality that the business is located within
-	#	if geo_tag != None:
+	
 	if not edge_relation:
 
 		geo_tags = inside_search_area[geo_entity].unique()		
 		nq = partial(neo_query, geo_entity=geo_entity, edge_relation=None)
 		results_list = run_imap_multiprocessing(func=nq, argument_list=geo_tags, num_processes=os.cpu_count(), chunksize=1)
-
+		os.system("stty sane")
 		query_string = 'match (a:{}) where a.name = "{}" return a'.format(geo_entity,geo_tags[0].replace("'","").replace(",",""))	
 		output = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
 					-- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string), shell=True))
@@ -129,7 +116,7 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, edge_re
 		output = [j.rstrip().lstrip().split(":") for j in output]
 		features = []
 		for k in output:
-			features.append(k[0])
+			features.append(geo_entity + "_" + k[0])
 		features[0] = geo_entity
 		geo_tag_df = pd.DataFrame(results_list, columns = features)
 		
@@ -139,8 +126,8 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, edge_re
 				
 		geo_tags = inside_search_area[geo_entity].unique()							
 		nq = partial(neo_query, geo_entity=geo_entity, edge_relation=edge_relation)
-		results_list = run_imap_multiprocessing(func=nq, argument_list=geo_tags, num_processes=os.cpu_count(), chunksize=chunksize)
-
+		results_list = run_imap_multiprocessing(func=nq, argument_list=geo_tags, num_processes=os.cpu_count(), chunksize=1)
+		os.system("stty sane")
 		query_string = 'match (a:{}) where a.name = "{}" return a'.format(geo_entity,geo_tags[0].replace("'","").replace(",",""))	
 		output = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
 					-- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string), shell=True))
@@ -152,14 +139,14 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, edge_re
 		features[0] = geo_entity
 		modified_features = []
 		for i in range(1,len(features)):
-			modified_feature.append(features[i] + "_" + edge_relation)
+			modified_features.append(geo_entity + "_" + features[i] + "_" + edge_relation)
 		features += modified_features	
 
 		geo_tag_df = pd.DataFrame(results_list, columns = features)
 
 		inside_search_area = inside_search_area.merge(geo_tag_df, how="left", on=geo_entity)
 
-	if outside_search_area:
+	if outside_search_area.shape[0] == 0:
 		print("a few of the business fall a bit outside {}. associating them with their closest {}...".format(city,geo_entity))
 		# pulling neighborhood polygons
 		with open('{}/{}_{}_reformatted.json'.format(geo_directory, city, geo_entity),'r') as f:
@@ -178,6 +165,10 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, edge_re
 				for j in range(len(features)):
 					outside_search_area.iloc[i][features[j]] = result[j]
 
+			pieces = (outside_search_area,inside_search_area)
+			demand_frame = pd.concat(pieces, ignore_index=True)
+			return demand_frame
+
 		else:
 
 			for i in tqdm(range(len(outside_search_area))): 
@@ -187,10 +178,11 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, edge_re
 				for j in range(len(features)):
 					outside_search_area.iloc[i][features[j]] = result[j]
 
-	pieces = (inside_search_area)
-	demand_frame = pd.concat(pieces, ignore_index=True)
+			pieces = (outside_search_area,inside_search_area)
+			demand_frame = pd.concat(pieces, ignore_index=True)	
+			return demand_frame
 
-	return demand_frame	
+	return inside_search_area	
 
 def run_imap_multiprocessing(func, argument_list, num_processes, chunksize=10):
 
@@ -221,9 +213,12 @@ def neo_query(geo_tag, geo_entity, edge_relation=None):
 	if edge_relation:
 		
 		query_string = 'match (a:{})-[:{}]->(b) where a.name = "{}" return b'.format(geo_entity,edge_relation,geo_tag.replace("'","").replace(",",""))			
-	
+		print("QUERY_STRING",query_string)
 		output = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
 					-- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string), shell=True))
+		print("output type:", type(output))
+		print("FIRST OUTPUT",output)
+		output = re.findall("{[\w\W]+?}",output)
 		outputs = []
 		for i in output:
 			outputs.append(i.replace("{","").replace("}","").replace('"','').split(","))
@@ -232,7 +227,10 @@ def neo_query(geo_tag, geo_entity, edge_relation=None):
 		outputs = [[j.rstrip().lstrip().split(":") for j in sublist] for sublist in outputs]
 		outputs = [[float([j][0][1].lstrip().rstrip()) for j in i] for i in outputs]
 		outputs = [np.nanmean(np.array(i)) for i in outputs]
+		print("OUTPUTS:", outputs)
 		results += outputs
+
+		print("RESULTS:",results)
 
 	return results
 	

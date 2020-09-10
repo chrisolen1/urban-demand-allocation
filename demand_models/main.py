@@ -32,6 +32,7 @@ if gcp:
 import utilities
 from demand_models.build_demand_model_utils import business_filter, connect_to_neo4j, graph_to_demand_model
 from data_prep.filter_utils import standardize_place_names
+geo_entity = []
 
 # load in raw business data 
 #df_types = pd.read_csv('../../data/dtypes.csv')['dtypes']
@@ -173,7 +174,7 @@ if answer == 2:
 		gm.create_structure(aggregate_by=aggregate_by, 
 				data_directory=data_directory_complete, 
 				file_name=file_name, **feature_function_pairs)
-
+		geo_entity += aggregate_by
 		result = input("Graph structure created and saved as {}.pkl. Would you like to add to it by\
 	 	choosing another combination of data type, data file, geographic aggregator, and features?\
 	 	Answer 'yes' or 'no'   ".format(graph_model_name))
@@ -189,16 +190,15 @@ if answer == 2:
 		print("Adding graph structure to Neo4j!")
 		gm.create_neo4j_queries()
 		gm.query_neo4j()
-	geo_types = aggregate_by
 	print("Done with graph model!")
 
 elif answer == 1:
 	print("retrieving node categories from existing graph")
-	geo_types = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 -- cypher-shell \
+	geo_entity = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 -- cypher-shell \
 		-u 'neo4j' -p 'asdf' -d 'neo4j' --format plain 'match (n) return distinct labels(n)'", shell=True))
-	geo_types = re.findall("(\[[\W\w]+\])",geo_types)[0].replace("]","").replace("[","").replace('"',"").split(",")
+	geo_entity = re.findall("(\[[\W\w]+\])",geo_entity)[0].replace("]","").replace("[","").replace('"',"").split(",")
 	print("retrieving attribute features from existing graph")
-	for geo_type in geo_types:
+	for geo_type in geo_entity:
 		features = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 -- cypher-shell \
 			-u 'neo4j' -p 'asdf' -d 'neo4j' --format plain 'match (a:{}) return keys(a)'".format(geo_type), shell=True))
 		features = re.findall("(\[[\W\w]+\])",features)[0].replace("]","").replace("[","").replace('"',"").split("\\r\\n")[0].split(",")
@@ -207,20 +207,21 @@ elif answer == 1:
 print("features",features)
 print("addng geo entities to demand data...")
 file_name = naics_str + ".csv"
-standardize_place_names(home_directory, file_name, full_path, geo_directory, geo_types, city, gcp)
+standardize_place_names(home_directory, file_name, full_path, geo_directory, geo_entity, city, gcp)
 # load geo tagged demand data 
 demand = pd.read_csv("{}/{}".format(full_path, file_name))
+edge_relation = input("please select from the following options for edge relations: 'NEXT_TO', 'None':   ")
+while True:
+	if edge_relation != 'NEXT_TO' and edge_relation != 'None':
+		edge_relation = input("please select from the following options for edge relations: 'NEXT_TO', 'None':   ")
+	elif edge_relation == 'None':
+		edge_relation = None
+		break
+	else:
+		break
 
-#### some line of question re edge relations for demand model 
-geo_entity = geo_types[0]
-demand = graph_to_demand_model(demand, geo_directory, geo_entity, city)
-
-
-"""
-demand = graph_to_demand_model(demand, "primary_type", neighborhoods, "neighborhood")
-demand = graph_to_demand_model(demand, "zestimate", neighborhoods, "neighborhood", edge_relation="NEXT_TO")
-demand = graph_to_demand_model(demand, "primary_type", neighborhoods, "neighborhood", edge_relation="NEXT_TO")
-"""
+for entity in geo_entity:
+	demand = graph_to_demand_model(demand, geo_directory, entity, city, edge_relation)
 
 # remove any null values
 demand.dropna(inplace=True)
