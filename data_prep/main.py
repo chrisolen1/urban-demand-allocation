@@ -15,12 +15,12 @@ gcp = parse_results.gcp
 
 import os
 
+# connect to gcs if gcp flag provided
 if gcp:
 	import gcsfs
 	from google.cloud import storage
 	storage_client = storage.Client()
 	
-
 import filter_utils	
 
 city = input("Welcome to the data store! What city would you like to examine?:   ").lower()
@@ -77,21 +77,21 @@ print("This data is already ready to go! Let's see if we need to standardize the
 result = [1 if "{}_{}_{}_standardized".format(data_type,city,year) in str(name).lower() else 0 for name in files_list]
 while True:
 	if sum(result) < 1:
-		geo_types = input("Let's standardize: Which of the following geographic entities would you like\
+		geo_entities = input("Let's standardize: Which of the following geographic entities would you like\
 			to add to the data set?. Put one space between each:   'neighborhood', 'tract'    ")
-		geo_types = geo_types.rstrip().split(" ")
+		geo_entities = geo_entities.rstrip().split(" ")
 		while True:
-			result = any([False if entity not in ['neighborhood','tract'] else True for entity in geo_types])
+			result = any([False if entity not in ['neighborhood','tract'] else True for entity in geo_entities])
 			if not result:
-				geo_types = input("Choose from the following. Put one space between each:    'neighborhood', 'tract'    ")
-				geo_types = geo_types.rstrip().split(" ")
+				geo_entities = input("Choose from the following. Put one space between each:    'neighborhood', 'tract'    ")
+				geo_entities = geo_entities.rstrip().split(" ")
 			else:
 				break
-		for entity in geo_types:
+		for entity in geo_entities:
 			
 		print("Standardizing place names...")
 		file_name = "{}_{}_{}.csv".format(data_type, city, year)
-		filter_utils.standardize_place_names(home_directory, file_name, data_directory_complete, geo_directory, geo_types, city, gcp)
+		filter_utils.geo_tag(home_directory, file_name, data_directory_complete, geo_directory, geo_entities, city, gcp)
 		print("Done!")
 		break
 	else:

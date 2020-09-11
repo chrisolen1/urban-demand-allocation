@@ -3,80 +3,96 @@ from shapely.geometry import shape, Point, Polygon
 import re
 from operator import itemgetter
 
+"""""""""""""""""""""""""""""""""""""""""""""""""""
+functions determining relationships between geographic
+shape polygons, coordinate points, etc. on latitude,
+longitude coordinate plane
+"""""""""""""""""""""""""""""""""""""""""""""""""""
+
 def point_lookup(polygon_dict, point):
 
 	"""
-	assign place label corresponding to the provided
+	Assign place label corresponding to the provided
 	(long, lat) or (lat, long) coordinate based on which 
-	polygon from polygon_dict it fits in
-	Note: the order of the coordinate tuple (lat,long) or (long,lat)
-	depends the orderings present in the polygon_dict
-	:polygon_dict: dict of locality coordinate lists, where each coordinate represents a 
-					vertex of the locality shape.
-	:point: tuple of coordinates corresponding to the point of interest
-	Returns: Name of the locality to which the provided point corresponds, 
-			name will be one of the polygon_dict keys, else returns "None"
+	polygon from polygon_dict it fits into.
+	Note: The required ordering of the coordinate tuple ((lat,long) vs. (long,lat))
+	depends on the orderings present in the polygon_dict
+	:polygon_dict: dictionary of geographic entity shape coordinate lists, where each coordinate represents a 
+	vertex of the geographic entity shape.
+	:point: tuple of (lat,long) or (long, lat) coordinates corresponding to the point of interest
+	Returns: Name of the geographic entity to which the provided point corresponds. 
+	The name will be one of the keys of the polygon_dict. If no match, returns "None". 
 	"""
+
 	assert(isinstance(polygon_dict, dict)), "\
 			polygon_dict argument must be of type dict"
 
 	assert(isinstance(point, tuple)), "\
 			point argument must be of type tuple"
-	# convert to point object
+	
+	# convert point to Point object
 	point = Point(point) 
 	
-	# iterate over locality keys
+	# iterate over geographic entity keys
 	for i in range(len(list(polygon_dict.keys()))):
-		result = Polygon(polygon_dict[list(polygon_dict.keys())[i]][0]).contains(point) # zero index is there because of zoning type in zoning data
+		# Note: zero index is there because of zoning type in zoning data
+		result = Polygon(polygon_dict[list(polygon_dict.keys())[i]][0]).contains(point) 
 		
 		# return the relevant key if we have a result
 		if result == True:
 			return list(polygon_dict.keys())[i]
 			break
 
+	# or else return string "None"
 	return "None" 
+
 	   
 def closest_to(polygon_dict, point):
 
 	"""
-	indicate the place closests in euclidean distance to
-	the provided point
-	:polygon_dict: dict of locality coordinate lists, where each coordinate represents a 
-					vertex of the locality shape.
-	:point: tuple of coordinates corresponding to the point of interest
-	Returns: name of the locality closest to the provided coordinate 
+	Indicate the geographic entity closest in euclidean distance to
+	the provided (lat,long) or (long,lat) tuple
+	:polygon_dict: dictionary of geographic entity shape coordinate lists, where each coordinate represents a 
+	vertex of the geographic entity shape.
+	:point: tuple of (lat,long) or (long, lat) coordinates corresponding to the point of interest
+	Returns: name of the geographic entity closest to the provided coordinate in euclidean distance 
 	"""
+
 	assert(isinstance(polygon_dict, dict)), "\
 			polygon_dict argument must be of type dict"
 
 	assert(isinstance(point, tuple)), "\
 			point argument must be of type tuple"
 
+	# convert point to Point object
 	point = Point(point) 
 	distances = []
 
+	# iterate over geographic entity keys
 	for i in range(len(list(polygon_dict.keys()))):
-		dist = point.distance(Polygon(polygon_dict[list(polygon_dict.keys())[i]][0])) # zero index is there because of zoning type in zoning data
+		# calculate euclidean distances
+		# Note: zero index is there because of zoning type in zoning data
+		dist = point.distance(Polygon(polygon_dict[list(polygon_dict.keys())[i]][0])) 
 		distances.append(dist)
 
+	# pull out and return minimum
 	j, value = min(enumerate(distances), key=itemgetter(1))
 	result = list(polygon_dict.keys())[j]
+	
 	return result
 
-	   
-# confirm intersection of two polygons
 
 def intersection(polygon_dict_1=None, polygon_name_1=None, polygon_dict_2=None, polygon_name_2=None):
 
 	"""
-	indicate whether two polygons overlap
-	:polygon_dict_1: first dict of locality coordinate lists, where each coordinate represents a 
-					vertex of the locality shape.
-	:polygon_name_1: name of first polygon with which to test intersection                    
-	:polygon_dict_2: second dict of locality coordinate lists, where each coordinate represents a 
-					vertex of the locality shape.
-	:polygon_name_2: name of second polygon with which to test intersection 
-	Returns; True if two polygons intersection, else False 
+	Indicate whether two polygons overlap
+	:polygon_dict_1: first dict of geographic entity shape coordinate lists, 
+	where each coordinate represents a vertex of the locality shape.
+	:polygon_name_1: name of a geographic entity from polygon_dict_1
+	:polygon_dict_2: second dict of geographic entity shape coordinate lists, 
+	where each coordinate represents a vertex of the locality shape.
+	:polygon_name_2: name of a geographic entity from polygon_dict_2
+	Returns: True if the two provided polygons intersection, else False 
 	"""
 
 	assert(isinstance(polygon_dict_1, dict)), "\
@@ -91,23 +107,30 @@ def intersection(polygon_dict_1=None, polygon_name_1=None, polygon_dict_2=None, 
 	assert(isinstance(polygon_name_2, str)), "\
 			polygon_name_2 argument must be of type str"
 
-	shape_1 = Polygon(polygon_dict_1[polygon_name_1][0]) 
-	shape_2 = Polygon(polygon_dict_2[polygon_name_2][0])
+	try:
+		shape_1 = Polygon(polygon_dict_1[polygon_name_1][0]) 
+	except:
+		print("{} not a geographic entity in {}".format(polygon_name_1, polygon_dict_1))
+	try:
+		shape_2 = Polygon(polygon_dict_2[polygon_name_2][0])
+	except:
+		print("{} not a geographic entity in {}".format(polygon_name_2, polygon_dict_2))
 	
 	try:
 		result = shape_1.intersects(shape_2)
 	except:
-		result = shape_1.buffer(0).intersects(shape_2.buffer(0)) # deal with cases where polygons have intersecting boundaries
+		# deal with edge cases where geographic entities' boundaries overlap
+		result = shape_1.buffer(0).intersects(shape_2.buffer(0)) 
 
 	return result
 	
 def list_invalid_polygons(polygon_dict):
 
 	"""
-	indicate whether any polygons in provided polygon_dict
-	are not valid polygons
-	:polygon_dict: dict of locality coordinate lists, where each coordinate represents a 
-					vertex of the locality shape.
+	Indicate whether any geographic entities in the provided polygon_dict
+	are not valid polygons.
+	:polygon_dict: dictionary of geographic entity shape coordinate lists, where each coordinate represents a 
+	vertex of the geographic entity shape.
 	Returns: list of invalid polygons
 	"""
 
