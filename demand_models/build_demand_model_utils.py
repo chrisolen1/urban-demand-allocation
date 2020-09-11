@@ -13,16 +13,23 @@ from tqdm import tqdm
 
 import utilities
 
-def business_filter(bus_frame, naics_codes):
+"""""""""""""""""""""""""""""""""""""""""""""""""""
+functions for creating features of demand model 
+using neo4j graph model
+"""""""""""""""""""""""""""""""""""""""""""""""""""
+
+def business_filter(bus_dataframe, naics_codes):
 
 	"""
-	:bus_frame: business dataframe
-	:years: list of integer years you would like to select out
+	Filter the business dataset based on naics code inputs. 
+	:bus_frame: business dataframe. Note: business datasets are already separated by years. 
 	:naics_codes: list of string naics codes you would like to select out,
-				will match only up to the length of the code provided
-	Returns: filtered business dataframe, potentially including sales volume for 
-	the same store for multiple years 
+	will match only up to the length of the code provided
+	Returns: filtered business dataframe
 	"""
+
+	assert(isinstance(bus_dataframe, pd.core.frame.DataFrame)), "\
+				bus_dataframe must be a pandas dataframe"
 	
 	assert(isinstance(naics_codes,list)), "\
 		naics_code argument must be of type list"
@@ -30,34 +37,25 @@ def business_filter(bus_frame, naics_codes):
 	assert(all(element for element in [isinstance(i,str) for i in naics_codes])), "\
 		all naics_codes must be of type str"
 
-	
 	# filter for indicated years and naics_codes
-	bus = naics_filter(bus_frame, naics_codes)
-	# drop meta data and other info used for filtering
+	bus_dataframe[bus_dataframe['primary_naics_code'].apply(parse_naics, args=[naics_codes])]
+	
+	# TODO: offer options for filtering in addition to naics_codes
+	# drop metadata used solely for filtering
 	bus.drop(['abi','primary_naics_code','company','business_status_code','company_holding_status',
 		'year_established','employee_size_location'], axis=1, inplace=True)
 
 	return bus
-		
-
-def naics_filter(bus_frame, naics_codes):
-	
-	"""
-	:bus_frame: business dataframe
-	:years: list of integer years you would like to select out
-	:naics_codes: list of string naics codes you would like to select out,
-				will match only up to the length of the code provided
-	Returns: dataframe of business data filtered for year and naics code
-	"""
-	
-	return bus_frame[bus_frame['primary_naics_code'].apply(parse_naics, args=[naics_codes])]
 	
 	
 def parse_naics(df_value, naics):
 	
 	"""
-	filter provided dataframe for naics codes. 
-	mean to be used in df.apply() 
+	Determine whether input string element fits input naics code.
+	:df_value: str, naics code from dataset
+	:naics: list, naics codes that we want to filter for 
+	Note: function meant to be used in df.apply() 
+	Returns: True if df_value matches naics
 	"""
 
 	results = []
@@ -82,7 +80,6 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, opt_dir
 	:geo_entity: str, locality type corresponding to the node types to which we're restricting the query (e.g. neighborhood or tract)
 	Returns: updated demand dataframe with new feature column
 	"""
-	
 	
 	print("populating demand predictors")
 	
