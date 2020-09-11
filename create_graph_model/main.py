@@ -115,7 +115,7 @@ while True:
 if finished:
 	print("Adding graph structure to Neo4j!")
 	gm.create_neo4j_queries()
-	gm.query_neo4j()
+	gm.run_neo4j_queries()
 	print("Done!")
 
 

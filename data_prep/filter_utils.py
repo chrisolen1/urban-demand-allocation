@@ -52,8 +52,13 @@ def geo_tag(home_directory, file_name, data_directory, geo_directory, geo_entiti
 	assert(isinstance(city,str)),"\
 		argument city must be of type str"
 
+	assert(isinstance(gcp,bool)), "\
+		argument gcp must be of type boolean"
+
+	# set path of top-level directory
 	import sys
 	sys.path.append(home_directory)
+	
 	import utilities
 	
 	# read in dataset
