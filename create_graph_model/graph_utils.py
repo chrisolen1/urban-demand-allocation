@@ -227,7 +227,7 @@ class graph_model(object):
 			G = nx.read_gpickle("{}/{}.pkl".format(self.graph_directory, self.graph_model_name))
 
 		# convert to neo4j query
-		neo = pynx_to_neo4j_queries(G, return_nodes=True, return_edges=True)
+		neo = self.pynx_to_neo4j_queries(G, return_nodes=True, return_edges=True)
 
 		# save as txt file
 		if self.gcp:
@@ -586,6 +586,14 @@ class graph_model(object):
 		return neo 
 
 def neo_query(query_string, gcp=False):		
+
+	"""
+	Run provided neo4j queries via kubectl or cypher shell
+	:query_string: str, provided 'CREATE' neo4j query
+	:gcp: bool, whether neo4j server is local or on gcp kubernetes engine
+	Returns: updates to neo4j server 
+	Note: We keep this outside of the class for reasons related to multiprocessing
+	"""
 
 	if gcp:
 			

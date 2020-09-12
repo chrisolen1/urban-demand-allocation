@@ -31,12 +31,10 @@ if gcp:
 
 import utilities
 from demand_models.build_demand_model_utils import business_filter, connect_to_neo4j, graph_to_demand_model
-from data_prep.filter_utils import standardize_place_names
+from data_prep.filter_utils import geo_tag
 geo_entity = []
 
 # load in raw business data 
-#df_types = pd.read_csv('../../data/dtypes.csv')['dtypes']
-#dtype=df_types.to_dict()
 city = input("Welcome to the demand model module! What city would you like to examine?:   ").lower()
 year = int(input("Please list the year of business data you are interested in. Year must be between\
 	2010 and 2018. You can select more years later:   "))
@@ -206,7 +204,7 @@ elif answer == 1:
 		
 print("addng geo entities to demand data...")
 file_name = naics_str + ".csv"
-standardize_place_names(home_directory, file_name, full_path, geo_directory, geo_entity, city, gcp)
+geo_tag(home_directory, file_name, full_path, geo_directory, geo_entity, city, gcp)
 # load geo tagged demand data 
 demand = pd.read_csv("{}/{}".format(full_path, file_name))
 os.system("stty sane")

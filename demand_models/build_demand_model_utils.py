@@ -55,7 +55,7 @@ def parse_naics(df_value, naics):
 	:df_value: str, naics code from dataset
 	:naics: list, naics codes that we want to filter for 
 	Note: function meant to be used in df.apply() 
-	Returns: True if df_value matches naics
+	Returns: True if df_value matches naics, else False 
 	"""
 
 	results = []
@@ -67,31 +67,67 @@ def parse_naics(df_value, naics):
 			results.append(True)
 		else:
 			results.append(False)
-			
+	
+	# True if there are any matches 	
 	return any(results)
+
 
 def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, opt_directory, gcp, edge_relation=None):
 	
 	"""
-	:graph: neo4j object from py2neo
-	:demand_frame: pandas dataframe of features predicting demand (sales) for each relevant business
-	:feature: str, location-based feature to be added from the neo4j graph to the demand_frame (e.g. avg_property_value)
-	:localities: json of locality shape coordinates of search area 
-	:geo_entity: str, locality type corresponding to the node types to which we're restricting the query (e.g. neighborhood or tract)
-	Returns: updated demand dataframe with new feature column
+	Create a relational demand model using neo4j graph model. 
+	:demand_frame: pandas dataframe of business-level data for a given year 
+	:geo_directory: str, location of geographic entity shape files 
+	:geo_entity: str, type of geographic entity that each business has been tagged with 
+	:city: str, city that the businesses are in 
+	:opt_directory: str, directory where we storing optimization variables, including the demand model 
+	:gcp: bool, whether processing is to be done on gcp or locally 
+	Returns: Returns dataframe with neo4j node attributes as features for each sample business. The appropriate node for each business 
+	is determined by a match between the business's geo_entity and the name of the node. 
 	"""
-	
+
+	assert(isinstance(demand_frame, pd.core.frame.DataFrame)), "\
+			argument demand_frame must be a pandas dataframe"
+
+	assert(isinstance(geo_directory,str)),"\
+			argument geo_directory must be of type str"				
+
+	assert(isinstance(geo_entity,str)),"\
+			argument geo_entity must be of type str"							
+
+	assert(isinstance(city,str)),"\
+			argument city must be of type str"							
+
+	assert(isinstance(opt_directory,str)),"\
+			argument opt_directory must be of type str"							
+
+	assert(isinstance(gcp,bool)),"\
+			argument gcp must be of type boolean"	
+
+	if not isinstance(edge_relation,type(None)):
+			assert isinstance(edge_relation, str),"\
+			argument edge_relation must be of type str"
+
 	print("populating demand predictors")
-	
+	# separate samples where geo-tagging was successful from those 
+	# where it wasn't	
 	inside_search_area = demand_frame[demand_frame[geo_entity] != "None"]
 	outside_search_area = demand_frame[demand_frame[geo_entity] == "None"]
 	
+	# if we're not factoring edge_relations into our model
 	if not edge_relation:
 
+		# pull out only unique geo-tags
+		# and pull the node attribute values corresponding to each geo-tag/node name from the neo4j server
 		geo_tags = inside_search_area[geo_entity].unique()		
+		# partial function sets the geo_entity and edge_relation constant
 		nq = partial(neo_query, geo_entity=geo_entity, edge_relation=None)
+		# create list of lists of node attribute values 
 		results_list = run_imap_multiprocessing(func=nq, argument_list=geo_tags, num_processes=os.cpu_count(), chunksize=1)
+		# fixes terminal output
 		os.system("stty sane")
+		
+		# specify the names of the new demand model features using the node attribute keys 
 		query_string = 'match (a:{}) where a.name = "{}" return a'.format(geo_entity,geo_tags[0].replace("'","").replace(",",""))	
 		output = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
 					-- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string), shell=True))
@@ -101,16 +137,25 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, opt_dir
 		for k in output:
 			features.append(geo_entity + "_" + k[0])
 		features[0] = geo_entity
+		# create df out of just node attribute values using derived column names 
 		geo_tag_df = pd.DataFrame(results_list, columns = features)
-		
+		# merge original data with new deman model features 
 		inside_search_area = inside_search_area.merge(geo_tag_df, how="left", on=geo_entity)
 
+	# if we're factoring edge_relations into our model
 	else:
-				
+			
+		# pull out only unique geo-tags
+		# and pull the node attribute values corresponding to each geo-tag/node name from the neo4j server	
 		geo_tags = inside_search_area[geo_entity].unique()							
+		# partial function sets the geo_entity and edge_relation constant
 		nq = partial(neo_query, geo_entity=geo_entity, edge_relation=edge_relation)
+		# create list of lists of node attribute values 
 		results_list = run_imap_multiprocessing(func=nq, argument_list=geo_tags, num_processes=os.cpu_count(), chunksize=1)
+		# fixes terminal output
 		os.system("stty sane")
+
+		# specify the names of the new demand model features using the node attribute keys 
 		query_string = 'match (a:{}) where a.name = "{}" return a'.format(geo_entity,geo_tags[0].replace("'","").replace(",",""))	
 		output = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
 					-- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string), shell=True))
@@ -124,11 +169,13 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, opt_dir
 		for i in range(1,len(features)):
 			modified_features.append(geo_entity + "_" + features[i] + "_" + edge_relation)
 		features += modified_features	
-
+		# create df out of just node attribute values using derived column names 
 		geo_tag_df = pd.DataFrame(results_list, columns = features)
-
+		# merge original data with new deman model features 
 		inside_search_area = inside_search_area.merge(geo_tag_df, how="left", on=geo_entity)
 
+	# for the edge cases where business samples actually fall a bit outside the city of analysis 
+	# we choose to associate them with their closest geographic entity 
 	if outside_search_area.shape[0] != 0:
 		print("a few of the business fall a bit outside {}. associating them with their closest {}...".format(city,geo_entity))
 		# pulling neighborhood polygons
@@ -147,7 +194,6 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, opt_dir
 		for i in range(1,len(features)):
 			outside_search_area[features[i]] = np.nan
 
-
 		if not edge_relation:
 			
 			for i in tqdm(range(len(outside_search_area))): 
@@ -157,8 +203,10 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, opt_dir
 				for j in range(len(features)):
 					outside_search_area.iloc[i][features[j]] = result[j]
 
+			# stack both dataframes on top of each other 
 			pieces = (outside_search_area,inside_search_area)
 			demand_frame = pd.concat(pieces, ignore_index=True)
+			
 			return demand_frame
 
 		else:
@@ -170,40 +218,70 @@ def graph_to_demand_model(demand_frame, geo_directory, geo_entity, city, opt_dir
 				for j in range(len(features)):
 					outside_search_area.iloc[i][features[j]] = result[j]
 
+			# stack both dataframes on top of each other 
 			pieces = (outside_search_area,inside_search_area)
 			demand_frame = pd.concat(pieces, ignore_index=True)	
+			
 			return demand_frame
 
-	return inside_search_area	
+	# if there aren't any cases outside the city of analysis, 
+	# we just return the inside_search_area dataframe
+	return inside_search_area
+
 
 def run_imap_multiprocessing(func, argument_list, num_processes, chunksize=10):
 
-		
-		pool = mp.Pool(processes=num_processes)
-		result_list = []
-		for result in tqdm(pool.imap(func=func, iterable=argument_list, chunksize=chunksize), total=len(argument_list)):
-			
-			result_list.append(result)
+	"""
+	Function for mapping a function over an iterable using multiple processes. 
+	:func: function to map
+	:argument_list: iterable on to which we are mapping func
+	:num_processes: int, number of processes to run in parallel; will be the maximum possible 
+	:chunkzsize: int, the size of the chunk of the iterable that we allocate to each process
+	Returns: output of func
+	"""
 
-		return result_list
+	pool = mp.Pool(processes=num_processes)
+	
+	result_list = []
+	for result in tqdm(pool.imap(func=func, iterable=argument_list, chunksize=chunksize), total=len(argument_list)):
+			
+		result_list.append(result)
+
+	return result_list
+
 
 def neo_query(geo_tag, geo_entity, edge_relation=None):		
 
+	"""
+	Query from an existing neo4j server (in order to populate demand model). 
+	:geo_tag: str, geographic tag belonging to a broader geographic entity type to be used in query.
+	Will correspond to a node name.
+	:geo_entity: str, type of geographic entity that each business has been tagged with 
+	:edge_relation: bool, whether we're factoring edge relationships into the demand model. 
+	Note: regardless of whether edge relationships are factored in and queried for, singularly node
+	attribute data will be pulled and incorporated first. 
+	Returns: query results from the neo4j server that need to be parsed through heavy string manipulation 
+	and are ultimately returned as lists of lists. 
+	"""
+
+	# construct query_string for non edge relation attributes
 	query_string = 'match (a:{}) where a.name = "{}" return a'.format(geo_entity,geo_tag.replace("'","").replace(",",""))	
+	# obtain query output and begin string cleanup
 	output = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
 					-- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string), shell=True))
-		
 	output = re.findall("(\{[\W\w]+\})",output)[0].replace("{","").replace("}","").replace('"','').split(",")		
 	output = [j.rstrip().lstrip().split(":") for j in output]
 		
 	results = []
-		
 	for k in output:
 		results.append(k[1].rstrip().lstrip())
 		
+	# begin edge relation queries if relevant 
 	if edge_relation:
 		
+		# construct edge relation query string
 		query_string = 'match (a:{})-[:{}]->(b) where a.name = "{}" return b'.format(geo_entity,edge_relation,geo_tag.replace("'","").replace(",",""))			
+		# obtain query output and begin string cleanup
 		output = str(subprocess.check_output("kubectl exec -it neo4j-ce-1-0 \
 					-- cypher-shell -u 'neo4j' -p 'asdf' -d 'neo4j' --format plain '{}'".format(query_string), shell=True))
 		output = re.findall("{[\w\W]+?}",output)
@@ -214,10 +292,16 @@ def neo_query(geo_tag, geo_entity, edge_relation=None):
 		outputs = [[outputs[j][i] for j in range(len(outputs))] for i in range(1,num_features)]
 		outputs = [[j.rstrip().lstrip().split(":") for j in sublist] for sublist in outputs]
 		outputs = [[float([j][0][1].lstrip().rstrip()) for j in i] for i in outputs]
+		# edge relation attributes are means of node attributes for all nodes pulled by edge relation 
 		outputs = [np.nanmean(np.array(i)) for i in outputs]
 		results += outputs
 
 	return results
+
+"""
+Antiquated functions developed for local neo4j server as opposed 
+to remote neo4j server hosted in kubernetes environment 
+"""
 	
 def connect_to_neo4j(uri, username, password):
 
